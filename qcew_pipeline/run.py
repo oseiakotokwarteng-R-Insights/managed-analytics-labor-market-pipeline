@@ -75,7 +75,8 @@ def run_pipeline(cfg, years=None, refs=None):
         # ---- 3. validate ----
         t = time.perf_counter()
         rows_by_year = {y: s["rows_kept"] for y, s in stats_by_year.items()}
-        checks = validate.run_checks(data, refs, cfg, years, rows_by_year)
+        scanned_by_year = {y: s["rows_scanned"] for y, s in stats_by_year.items()}
+        checks = validate.run_checks(data, refs, cfg, years, rows_by_year, scanned_by_year)
         summary = validate.summarize(checks)
         timings["validate"] = round(time.perf_counter() - t, 2)
         for c in checks:

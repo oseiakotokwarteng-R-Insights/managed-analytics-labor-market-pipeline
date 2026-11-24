@@ -5,7 +5,7 @@ flowchart LR
     A[BLS annual QCEW files<br/>one zip per year] --> B[collect.py<br/>download, hash, log]
     R[BLS code files<br/>areas, industries, ownership] --> B
     B --> C[transform.py<br/>filter to DC/MD/VA, rename,<br/>fix types, suppressed to NULL]
-    C --> D{validate.py<br/>16 checks}
+    C --> D{validate.py<br/>18 checks}
     D -- any error --> F[Stop. Record the failure.<br/>Nothing is loaded.]
     D -- pass or warnings only --> E[load.py<br/>upsert into SQLite]
     E --> G[(qcew_dmv.sqlite)]
@@ -35,6 +35,7 @@ flowchart LR
 
 * **Fail the whole run if one year fails.** If a download or a check fails for one year, nothing is loaded. A multi-year table with a silent hole in it would be worse than no new data.
 * **Validate before loading.** The database only ever contains data that passed the error-level checks.
+* **Warn about drift, don't stop for it.** Two warnings compare each year with the one before: a big jump in the share of hidden values, and a big change in how many rows BLS published. Either could be a real change at BLS or a problem with the file, and I can't tell which from here, so they are recorded and I look into them. The limits are in `config.toml`. They only compare years inside the same run.
 * **A rolling window of years.** By default the pipeline pulls the five most recent years and always includes the newest one BLS has published, so a new release is picked up without editing anything. Years that fall out of the window stay in the database and are simply no longer refreshed. Pin a fixed list in `config.toml` when you need a frozen, reproducible set.
 * **Stage, then compare inside the database.** The new rows are copied into a temporary table and SQLite does the comparing and the upsert as set operations. The stored table is never read into pandas and there is no row-by-row Python loop. On 600,000 made-up rows (about four times the real DMV data) a rerun took 7.6 s instead of 22.5 s, and a typical revision 9.5 s instead of 21.3 s (`python evaluation/benchmark_load.py --rows 600000`). The new rows themselves are still held in memory, so there is a ceiling; the next step past it would be loading year by year.
 * **Upsert, not append.** Re-running can't create duplicates, and changed values are counted so BLS revisions are visible.

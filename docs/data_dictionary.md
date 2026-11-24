@@ -94,6 +94,8 @@ One row per check per run: `check_name`, `level` (error / warn / info), `passed`
 | `county_totals_agree_with_state_total` | warn | County totals not adding up to BLS's published state total (within 2%). |
 | `sector_sum_not_above_county_total` | warn | Sector employment adding up to more than the county total. |
 | `suppression_rate` | info | How many rows are suppressed. |
+| `suppression_rate_stable` | warn | A year whose share of hidden values is more than 5 points higher than the year before. |
+| `source_rows_stable` | warn | A year whose national BLS file has more than 10% more or fewer rows than the year before. |
 
 Errors stop the load. Warnings are recorded and left for a human to look at.
 

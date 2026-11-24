@@ -35,13 +35,14 @@ def _result(name, level, failed_count, detail_if_fail, detail_if_pass="ok"):
     return CheckResult(name, level, passed, int(failed_count), detail_if_pass if passed else detail_if_fail)
 
 
-def run_checks(df, refs, cfg, years_expected, rows_by_year=None):
+def run_checks(df, refs, cfg, years_expected, rows_by_year=None, scanned_by_year=None):
     """Run every check and return the list of results.
 
     df             - the standardized table I'm about to load
     refs           - the BLS code/title lookup tables
     years_expected - the years the config asked for
     rows_by_year   - how many rows each year's file produced (for the completeness check)
+    scanned_by_year - how many rows BLS's national file had for each year (for the drift check)
     """
     v = cfg["validation"]
     results = []
@@ -159,6 +160,10 @@ def run_checks(df, refs, cfg, years_expected, rows_by_year=None):
     results.append(_state_reconciliation(df, v["state_reconciliation_tolerance"]))
     results.append(_sector_vs_total(df, v["sector_sum_tolerance"]))
 
+    # ---- drift: does each year look like the one before it? (warnings only) ----
+    results.append(_suppression_drift(df, v.get("suppression_jump_points", 5.0)))
+    results.append(_source_volume_drift(scanned_by_year, v.get("source_rows_change_fraction", 0.10)))
+
     return results
 
 
@@ -247,6 +252,49 @@ def _sector_vs_total(df, tolerance):
         len(too_big),
         f"{len(too_big)} county-years where sector employment exceeds the county total",
         f"checked {len(joined):,} county-years; none above the county total",
+    )
+
+
+def _suppression_drift(df, max_jump_points):
+    """Warn if the share of hidden (suppressed) values jumps up from one year to the next."""
+    name = "suppression_rate_stable"
+    rate = (df.groupby("year")["is_suppressed"].mean() * 100).to_dict()
+    years = sorted(rate)
+    if len(years) < 2:
+        return CheckResult(name, "warn", True, 0, "needs at least two years to compare")
+    jumps = []
+    for prev, cur in zip(years, years[1:]):
+        rise = rate[cur] - rate[prev]
+        if rise > max_jump_points:
+            jumps.append(f"{int(cur)}: {rate[cur]:.1f}% hidden, up {rise:.1f} points from {int(prev)}")
+    return _result(
+        name,
+        "warn",
+        len(jumps),
+        "; ".join(jumps) + f" (limit {max_jump_points:g} points)",
+        f"no year-to-year jump above {max_jump_points:g} points",
+    )
+
+
+def _source_volume_drift(scanned_by_year, max_change):
+    """Warn if a year's national file from BLS has many more or fewer rows than the year before."""
+    name = "source_rows_stable"
+    if not scanned_by_year or len(scanned_by_year) < 2:
+        return CheckResult(name, "warn", True, 0, "needs row counts for at least two years to compare")
+    years = sorted(scanned_by_year)
+    changes = []
+    for prev, cur in zip(years, years[1:]):
+        before, now = scanned_by_year[prev], scanned_by_year[cur]
+        if before and abs(now - before) / before > max_change:
+            share = abs(now - before) / before
+            word = "fewer" if now < before else "more"
+            changes.append(f"{cur}: {now:,} rows in the BLS file, {share:.1%} {word} than {prev} ({before:,})")
+    return _result(
+        name,
+        "warn",
+        len(changes),
+        "; ".join(changes) + f" (limit {max_change:.0%})",
+        f"no year-to-year change above {max_change:.0%}",
     )
 
 

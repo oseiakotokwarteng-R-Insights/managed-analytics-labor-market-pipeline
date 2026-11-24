@@ -14,20 +14,20 @@ It does four things, one after the other:
 
 1. **Collect.** It downloads each year's file from BLS and tries again if a download fails. It writes down where each file came from, when it was downloaded, and a short code (a SHA-256 hash) that's unique to that file, so anyone can check they have the exact same one.
 2. **Transform.** The national files are huge, about 3.6 million rows a year. It reads them in pieces and keeps only the rows I need. When BLS hides a number to protect a business's privacy, I leave it blank. I never turn it into a zero.
-3. **Validate.** It runs 16 checks. If one finds a real error, the run stops and nothing gets saved.
+3. **Validate.** It runs 18 checks. If one finds a real error, the run stops and nothing gets saved. Two of the checks only warn, and they compare each year with the one before it (more on that below).
 4. **Load.** It saves everything into a SQLite database in one go. Running it twice doesn't create duplicates. If BLS changes a number it already published, I count it. If BLS stops publishing a row, that row moves to a separate table, so nothing quietly disappears.
 
 By default it works out the newest year BLS has published and pulls that year plus the four before it. Right now that means 2021 to 2025. When BLS publishes 2026, it will move to 2022 to 2026 on its own. Years that drop out of the window stay in the database. They just stop being refreshed.
 
 ## A real run
 
-I ran it in Google Colab from a fresh copy of this repository. It downloaded the five files, read about 17.7 million rows, and kept 16,262 of them. That took about 140 seconds, and all 16 checks passed. I ran it a second time right after. It found nothing to insert, nothing changed, and nothing removed, and it took 82 seconds because the files were already on disk. Both runs ended with the same data fingerprint, so the second run rebuilt exactly what the first one saved. All 92 automated tests passed there too.
+I ran it in Google Colab from a fresh copy of this repository. It downloaded the five files, read about 17.7 million rows, and kept 16,262 of them. That took about 140 seconds, and all 16 of the checks it had then passed. I ran it a second time right after. It found nothing to insert, nothing changed, and nothing removed, and it took 82 seconds because the files were already on disk. Both runs ended with the same data fingerprint, so the second run rebuilt exactly what the first one saved. All 92 automated tests passed there too.
 
-One thing I noticed: the share of values BLS hides keeps going up. It was about 24% in 2021 and 2022, 28% in 2024, and 36% in 2025. The 2025 file also has about 16% fewer rows nationally than 2024. I don't know why yet. The pipeline records these numbers but doesn't stop for them. I want to add warnings for jumps like this.
+One thing I noticed: the share of values BLS hides keeps going up. It was about 24% in 2021 and 2022, 28% in 2024, and 36% in 2025. The 2025 file also has about 16% fewer rows nationally than 2024. I don't know why yet. The pipeline recorded these numbers but didn't say anything about them, so I added two warnings. One is for a big jump in the share of hidden values from one year to the next, and the other is for a big change in how many rows BLS published. Both would have flagged 2025. They don't stop a run. They show up in the log and in the database so I can go and look.
 
 ## What I'm working on
 
-1. **Make it sturdier.** Mostly done. It now notices rows BLS removes, loads faster, follows the newest year by itself, runs in Docker, and has style and type checks. Still to add: warnings when the data suddenly changes shape, like the jump above.
+1. **Make it sturdier.** Done. It now notices rows BLS removes, loads faster, follows the newest year by itself, warns when the data suddenly changes shape, runs in Docker, and has style and type checks.
 2. **An analytics layer.** Parquet files, then DuckDB and dbt models with tests.
 3. **Scheduling and alerts.** Dagster to run it on a schedule, and an email when something needs attention.
 4. **More sources.** A second source, checks between the two, and California added by changing a setting instead of the code.

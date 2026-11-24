@@ -64,6 +64,11 @@ min_rows_per_year = 3000
 state_reconciliation_tolerance = 0.02
 # How far the sum of sector employment can exceed the county total (1%).
 sector_sum_tolerance = 0.01
+# Drift warnings (they never stop a run). A year whose share of hidden values is more than this many
+# percentage points higher than the year before gets a warning.
+suppression_jump_points = 5.0
+# A year whose national BLS file has this much more or fewer rows than the year before gets a warning.
+source_rows_change_fraction = 0.10
 # avg_annual_pay should be about 52 x avg_weekly_wage. Allow some rounding room.
 wage_check_tolerance_dollars = 60
 
