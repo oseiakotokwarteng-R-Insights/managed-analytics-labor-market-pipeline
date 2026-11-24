@@ -115,13 +115,13 @@ def test_stable_years_pass_both_drift_checks(clean_df, refs, cfg):
 
 
 def test_a_jump_in_hidden_values_is_a_warning_and_never_an_error(clean_df, refs, cfg):
-    hide(clean_df, clean_df.index[clean_df["year"] == 2024][:4])      # 4 of 13 rows: a jump of about 31 points
+    hide(clean_df, clean_df.index[clean_df["year"] == 2024][:4])  # 4 of 13 rows: a jump of about 31 points
     results = validate.run_checks(clean_df, refs, cfg, YEARS, scanned_by_year={2023: 1000, 2024: 1000})
     found = {r.name: r for r in results}["suppression_rate_stable"]
 
     assert not found.passed and found.level == "warn"
     assert "2024" in found.detail and "from 2023" in found.detail
-    assert validate.summarize(results)["errors"] == 0                 # drift never blocks a load
+    assert validate.summarize(results)["errors"] == 0  # drift never blocks a load
 
 
 def test_a_big_drop_in_rows_from_bls_is_a_warning(clean_df, refs, cfg):
