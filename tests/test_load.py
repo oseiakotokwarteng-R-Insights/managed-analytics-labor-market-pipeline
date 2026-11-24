@@ -2,6 +2,8 @@
 
 import sqlite3
 
+import pandas as pd
+
 from qcew_pipeline import load
 
 
@@ -163,3 +165,54 @@ def test_an_older_database_gets_the_new_column(cfg):
     load._add_missing_columns(conn)
     columns = {row[1] for row in conn.execute("PRAGMA table_info(pipeline_runs)")}
     assert "rows_removed" in columns
+
+
+# ---------------------------------------------------------------- the staging table
+def staging_tables(conn):
+    return conn.execute("SELECT name FROM sqlite_temp_master WHERE type = 'table'").fetchall()
+
+
+def test_the_staging_table_is_cleaned_up_after_a_load(cfg, refs, clean_df):
+    conn, run_id = fresh_db(cfg, refs)
+    load.load_facts(conn, clean_df, run_id, fake_sources(conn, run_id), cfg)
+    assert staging_tables(conn) == []
+
+
+def test_the_staging_table_is_cleaned_up_after_a_failed_load(cfg, refs, clean_df):
+    conn, run_id = fresh_db(cfg, refs)
+    ids = fake_sources(conn, run_id)
+    load.load_facts(conn, clean_df, run_id, ids, cfg)
+    try:
+        load.load_facts(conn, clean_df.iloc[::2], run_id, ids, cfg)      # too many rows would go
+    except load.TooManyRemovedError:
+        pass
+    assert staging_tables(conn) == []
+    assert not conn.in_transaction
+
+
+def test_a_chunk_size_smaller_than_the_data_gives_the_same_result(cfg, refs, clean_df, monkeypatch):
+    conn_a, run_a = fresh_db(cfg, refs)
+    load.load_facts(conn_a, clean_df, run_a, fake_sources(conn_a, run_a), cfg)
+    expected = load.analytic_hash(conn_a)
+
+    monkeypatch.setattr(load, "STAGING_CHUNK", 4)                       # many small pieces
+    cfg["paths"]["db_path"] = cfg["paths"]["db_path"].with_name("chunked.sqlite")
+    conn_b, run_b = fresh_db(cfg, refs)
+    counts = load.load_facts(conn_b, clean_df, run_b, fake_sources(conn_b, run_b), cfg)
+
+    assert counts["inserted"] == len(clean_df)
+    assert load.analytic_hash(conn_b) == expected
+
+
+def test_duplicate_keys_in_the_new_data_are_refused_and_nothing_is_loaded(cfg, refs, clean_df):
+    # Validation normally catches duplicates first; the staging table is a second line of defence.
+    conn, run_id = fresh_db(cfg, refs)
+    doubled = pd.concat([clean_df, clean_df.iloc[[0]]])
+    try:
+        load.load_facts(conn, doubled, run_id, fake_sources(conn, run_id), cfg)
+    except sqlite3.IntegrityError:
+        pass
+    else:
+        raise AssertionError("expected the duplicate key to be refused")
+    assert load.count_rows(conn) == 0
+    assert staging_tables(conn) == []

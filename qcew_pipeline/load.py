@@ -13,8 +13,6 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pandas as pd
-
 from .transform import MEASURES, area_type
 
 SCHEMA_FILE = Path(__file__).resolve().parent.parent / "sql" / "schema.sql"
@@ -110,11 +108,21 @@ def load_reference_tables(conn, refs, cfg):
 
 
 # ---------------------------------------------------------------- the main load
-KEY = ["area_fips", "year", "own_code", "industry_code"]
-
-
 class TooManyRemovedError(Exception):
     """Raised when a load would remove an unusually large share of the stored rows."""
+
+
+KEY = ["area_fips", "year", "own_code", "industry_code"]
+STAGING_COLUMNS = (["area_fips", "year", "own_code", "industry_code", "agglvl_code", "disclosure_code",
+                    "is_suppressed"] + MEASURES + ["source_file_id"])
+# Rows are copied into the staging table in pieces of this size, so memory stays flat.
+STAGING_CHUNK = 50_000
+
+_SAME_KEY = " AND ".join(f"{{a}}.{c} = {{b}}.{c}" for c in KEY)
+
+
+def _same_key(a, b):
+    return _SAME_KEY.format(a=a, b=b)
 
 
 def _scope_filter(years, cfg):
@@ -132,29 +140,46 @@ def _scope_filter(years, cfg):
 def count_in_scope(conn, years, cfg):
     """How many stored rows fall inside the run's years and configured scope."""
     sql, params = _scope_filter(years, cfg)
-    return conn.execute(f"SELECT COUNT(*) FROM qcew_annual WHERE {sql}", params).fetchone()[0]
+    # NOT INDEXED: reading the rows in order is faster here than looking each one up through an index.
+    return conn.execute(f"SELECT COUNT(*) FROM qcew_annual NOT INDEXED WHERE {sql}", params).fetchone()[0]
 
 
-def find_removed_rows(conn, df, years, cfg):
-    """Stored rows (same years and scope) that the new data no longer contains.
+def _stage(conn, df, source_ids_by_year):
+    """Copy the incoming rows into a temporary table inside the database, in chunks.
 
-    Returns (keys of removed rows, how many rows were stored in scope).
+    From here on, comparing against what is stored is done by SQLite itself, so the stored
+    table never has to be read into pandas.
     """
-    sql, params = _scope_filter(years, cfg)
-    stored = pd.read_sql_query(
-        f"SELECT area_fips, year, own_code, industry_code FROM qcew_annual WHERE {sql}", conn, params=params)
-    check = stored.merge(df[KEY], on=KEY, how="left", indicator=True)
-    removed = check.loc[check["_merge"] == "left_only", KEY]
-    return removed, len(stored)
+    conn.execute("DROP TABLE IF EXISTS temp.stg_qcew_annual")
+    conn.execute("""
+        CREATE TEMP TABLE stg_qcew_annual (
+            area_fips TEXT NOT NULL, year INTEGER NOT NULL, own_code TEXT NOT NULL,
+            industry_code TEXT NOT NULL, agglvl_code TEXT NOT NULL, disclosure_code TEXT,
+            is_suppressed INTEGER NOT NULL, establishments REAL, employment REAL, total_wages REAL,
+            avg_weekly_wage REAL, avg_annual_pay REAL, source_file_id INTEGER,
+            PRIMARY KEY (area_fips, year, own_code, industry_code))""")
+    staged = df.copy()
+    staged["source_file_id"] = staged["year"].map(lambda y: source_ids_by_year[int(y)])
+    staged["year"] = staged["year"].astype("int64")
+    staged = staged[STAGING_COLUMNS]
+    # Python objects with None for missing values: what sqlite3 expects (it can't bind pandas NA).
+    staged = staged.astype(object).where(staged.notna(), None)
+    placeholders = ",".join("?" * len(STAGING_COLUMNS))
+    sql = f"INSERT INTO temp.stg_qcew_annual ({', '.join(STAGING_COLUMNS)}) VALUES ({placeholders})"
+    for start in range(0, len(staged), STAGING_CHUNK):
+        chunk = staged.iloc[start:start + STAGING_CHUNK]
+        conn.executemany(sql, chunk.itertuples(index=False, name=None))
 
 
-def _as_none(value):
-    """sqlite3 wants None, not pandas NA/NaN, for NULL."""
-    return None if pd.isna(value) else value
+def _count(conn, sql, params=()):
+    return conn.execute(sql, params).fetchone()[0]
 
 
 def load_facts(conn, df, run_id, source_ids_by_year, cfg):
     """Upsert the standardized rows. Returns counts of inserted / changed / unchanged / removed rows.
+
+    How it works: the new rows go into a temporary staging table, and SQLite does the rest
+    (what is new, what changed, what BLS no longer publishes, and the upsert itself).
 
     "Removed" means a row that was stored from an earlier run but is no longer in what BLS
     published. Those rows are copied to qcew_annual_removed and taken out of qcew_annual.
@@ -165,83 +190,73 @@ def load_facts(conn, df, run_id, source_ids_by_year, cfg):
     half-loaded.
     """
     years = sorted(int(y) for y in df["year"].unique())
-    removed_keys, stored_in_scope = find_removed_rows(conn, df, years, cfg)
-    n_removed = len(removed_keys)
+    scope_sql, scope_params = _scope_filter(years, cfg)
     max_fraction = cfg.get("load", {}).get("max_removed_fraction", 0.05)
-    if stored_in_scope and n_removed / stored_in_scope > max_fraction:
-        raise TooManyRemovedError(
-            f"{n_removed:,} of {stored_in_scope:,} stored rows ({n_removed / stored_in_scope:.1%}) are missing "
-            f"from the new data, more than the {max_fraction:.0%} limit. Nothing was changed.")
-    existing = pd.read_sql_query(
-        f"SELECT * FROM qcew_annual WHERE year IN ({','.join('?' * len(years))})",
-        conn, params=years)
+    same_as_staged = f"EXISTS (SELECT 1 FROM temp.stg_qcew_annual s WHERE {_same_key('s', 'qcew_annual')})"
+    differs = " OR ".join(f"s.{c} IS NOT q.{c}" for c in MEASURES + ["is_suppressed", "disclosure_code"])
 
-    # Work out which incoming rows are new, identical, or different from what's stored.
-    cols_to_compare = MEASURES + ["is_suppressed", "disclosure_code"]
-    merged = df.merge(existing[KEY + cols_to_compare], on=KEY, how="left",
-                      suffixes=("", "_old"), indicator=True)
-    is_new = merged["_merge"] == "left_only"
-    existing_rows = merged.loc[~is_new]
-
-    def differs(col):
-        a, b = existing_rows[col], existing_rows[col + "_old"]
-        same = (a == b) | (a.isna() & b.isna())
-        return ~same.fillna(False).astype(bool)
-
-    changed_mask = pd.Series(False, index=existing_rows.index)
-    for col in cols_to_compare:
-        changed_mask |= differs(col)
-    n_inserted, n_changed = int(is_new.sum()), int(changed_mask.sum())
-    n_unchanged = len(existing_rows) - n_changed
-
-    records = []
-    for row in df.itertuples(index=False):
-        records.append((
-            row.area_fips, int(row.year), row.own_code, row.industry_code, row.agglvl_code,
-            _as_none(row.disclosure_code), int(row.is_suppressed),
-            _as_none(row.establishments), _as_none(row.employment), _as_none(row.total_wages),
-            _as_none(row.avg_weekly_wage), _as_none(row.avg_annual_pay),
-            source_ids_by_year[int(row.year)], run_id))
-
-    sql = """
-        INSERT INTO qcew_annual (area_fips, year, own_code, industry_code, agglvl_code,
-            disclosure_code, is_suppressed, establishments, employment, total_wages,
-            avg_weekly_wage, avg_annual_pay, source_file_id, last_run_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        ON CONFLICT (area_fips, year, own_code, industry_code) DO UPDATE SET
-            agglvl_code = excluded.agglvl_code,
-            disclosure_code = excluded.disclosure_code,
-            is_suppressed = excluded.is_suppressed,
-            establishments = excluded.establishments,
-            employment = excluded.employment,
-            total_wages = excluded.total_wages,
-            avg_weekly_wage = excluded.avg_weekly_wage,
-            avg_annual_pay = excluded.avg_annual_pay,
-            source_file_id = excluded.source_file_id,
-            last_run_id = excluded.last_run_id
-    """
     try:
         conn.execute("BEGIN")
+        _stage(conn, df, source_ids_by_year)
+
+        # ---- work out what this load will do, before changing anything ----
+        n_staged = _count(conn, "SELECT COUNT(*) FROM temp.stg_qcew_annual")
+        n_inserted = _count(conn, f"""
+            SELECT COUNT(*) FROM temp.stg_qcew_annual s
+            WHERE NOT EXISTS (SELECT 1 FROM qcew_annual q WHERE {_same_key('s', 'q')})""")
+        n_changed = _count(conn, f"""
+            SELECT COUNT(*) FROM temp.stg_qcew_annual s
+            JOIN qcew_annual q ON {_same_key('s', 'q')} WHERE {differs}""")
+        n_unchanged = n_staged - n_inserted - n_changed
+        # One pass over the stored rows in scope: how many there are, and how many are no longer published.
+        stored_in_scope, n_removed = conn.execute(
+            f"SELECT COUNT(*), COALESCE(SUM(NOT {same_as_staged}), 0) FROM qcew_annual NOT INDEXED "
+            f"WHERE {scope_sql}", scope_params).fetchone()
+        if stored_in_scope and n_removed / stored_in_scope > max_fraction:
+            raise TooManyRemovedError(
+                f"{n_removed:,} of {stored_in_scope:,} stored rows ({n_removed / stored_in_scope:.1%}) are missing "
+                f"from the new data, more than the {max_fraction:.0%} limit. Nothing was changed.")
+
+        # ---- rows BLS stopped publishing: archive, then remove ----
         if n_removed:
-            key_params = [tuple(r) for r in removed_keys.astype({"year": int}).itertuples(index=False, name=None)]
-            conn.executemany(
-                """INSERT INTO qcew_annual_removed (area_fips, year, own_code, industry_code, agglvl_code,
+            conn.execute(f"""
+                INSERT INTO qcew_annual_removed (area_fips, year, own_code, industry_code, agglvl_code,
                        disclosure_code, is_suppressed, establishments, employment, total_wages,
                        avg_weekly_wage, avg_annual_pay, source_file_id, last_run_id, removed_run_id, removed_at)
-                   SELECT area_fips, year, own_code, industry_code, agglvl_code,
-                          disclosure_code, is_suppressed, establishments, employment, total_wages,
-                          avg_weekly_wage, avg_annual_pay, source_file_id, last_run_id, ?, ?
-                   FROM qcew_annual
-                   WHERE area_fips = ? AND year = ? AND own_code = ? AND industry_code = ?""",
-                [(run_id, now_iso(), *k) for k in key_params])
-            conn.executemany(
-                "DELETE FROM qcew_annual WHERE area_fips = ? AND year = ? AND own_code = ? AND industry_code = ?",
-                key_params)
-        conn.executemany(sql, records)
+                SELECT area_fips, year, own_code, industry_code, agglvl_code,
+                       disclosure_code, is_suppressed, establishments, employment, total_wages,
+                       avg_weekly_wage, avg_annual_pay, source_file_id, last_run_id, ?, ?
+                FROM qcew_annual NOT INDEXED WHERE {scope_sql} AND NOT {same_as_staged}""",
+                [run_id, now_iso(), *scope_params])
+            conn.execute(f"DELETE FROM qcew_annual NOT INDEXED WHERE {scope_sql} AND NOT {same_as_staged}",
+                         scope_params)
+
+        # ---- insert new rows and update existing ones ----
+        conn.execute("""
+            INSERT INTO qcew_annual (area_fips, year, own_code, industry_code, agglvl_code,
+                disclosure_code, is_suppressed, establishments, employment, total_wages,
+                avg_weekly_wage, avg_annual_pay, source_file_id, last_run_id)
+            SELECT area_fips, year, own_code, industry_code, agglvl_code,
+                disclosure_code, is_suppressed, establishments, employment, total_wages,
+                avg_weekly_wage, avg_annual_pay, source_file_id, ?
+            FROM temp.stg_qcew_annual WHERE true
+            ON CONFLICT (area_fips, year, own_code, industry_code) DO UPDATE SET
+                agglvl_code = excluded.agglvl_code,
+                disclosure_code = excluded.disclosure_code,
+                is_suppressed = excluded.is_suppressed,
+                establishments = excluded.establishments,
+                employment = excluded.employment,
+                total_wages = excluded.total_wages,
+                avg_weekly_wage = excluded.avg_weekly_wage,
+                avg_annual_pay = excluded.avg_annual_pay,
+                source_file_id = excluded.source_file_id,
+                last_run_id = excluded.last_run_id""", [run_id])
         conn.commit()
     except Exception:
         conn.rollback()
         raise
+    finally:
+        conn.execute("DROP TABLE IF EXISTS temp.stg_qcew_annual")
 
     return {"inserted": n_inserted, "changed": n_changed, "unchanged": n_unchanged, "removed": n_removed}
 
