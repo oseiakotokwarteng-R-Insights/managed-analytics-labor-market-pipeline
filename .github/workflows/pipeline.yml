@@ -36,7 +36,7 @@ jobs:
       - name: Formatting
         run: |
           status=0
-          NO_COLOR=1 ruff format --check . 2>&1 | sed -E 's/\[[0-9;]*m//g' > format.txt || true
+          NO_COLOR=1 ruff format --check . 2>&1 | sed -E 's/\x1b\[[0-9;]*m//g' > format.txt || true
           ruff format --check . > /dev/null 2>&1 || status=$?
           cat format.txt
           sed -n 's/^Would reformat: \(.*\)$/::error file=\1::Not formatted the way ruff format writes it/p' format.txt
