@@ -42,35 +42,6 @@ jobs:
           sed -n 's/^Would reformat: \(.*\)$/::error file=\1::Not formatted the way ruff format writes it/p' format.txt
           exit $status
 
-  autoformat:
-    # Temporary helper: a commit message containing [autoformat] makes GitHub format the code and commit it.
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[autoformat]')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install ruff
-      - run: |
-          ruff format .
-          ruff check . --fix
-      - name: Commit the formatting
-        run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "Format code with ruff"
-            git push
-          else
-            echo "Nothing to format."
-          fi
-
   typecheck:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
