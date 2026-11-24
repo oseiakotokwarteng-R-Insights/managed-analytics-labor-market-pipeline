@@ -55,6 +55,12 @@ qcew-build
 
 The tests include the ones I care most about. A hidden value must never be a zero. No two rows can share the same key. Every code must exist in BLS's own list. The counties must add up to the state total, and the sectors must never add up to more than the county. If one fails, the build fails. The limits come from `config.toml`, the same ones the pipeline uses.
 
+### Something the tests caught
+
+The first time I ran the dbt tests on the real data, one of them failed. In Maryland and Virginia the counties added up to about 4% to 7% less than the state total that BLS published. The pipeline's own check had said everything matched, so something was off.
+
+The reason is a bucket BLS calls "unknown or undefined". It holds jobs that BLS can't place in a single county. The pipeline's check had always counted that bucket. My first dbt table only looked at real counties, so it left the bucket out, and the numbers didn't add up. The test was right and my table was wrong. The state table now shows the named counties, the bucket, and the state total side by side, and the test checks that they add up. It's worth knowing before you read anything into county numbers: in Maryland and Virginia a few percent of the state's jobs don't belong to any county.
+
 ## Try it
 
 You need Python 3.11 or newer. Then run these two commands:

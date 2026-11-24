@@ -28,7 +28,16 @@ TOLERANCE = 1e-9
 EXAMPLES = 5
 COUNTY_KEY = ["year", "area_fips"]
 SECTOR_KEY = ["year", "area_fips", "industry_code"]
-STATE_COLUMNS = ["year", "state_fips", "bls_state_employment", "county_sum_employment", "county_count", "gap_pct"]
+STATE_COLUMNS = [
+    "year",
+    "state_fips",
+    "bls_state_employment",
+    "county_sum_employment",
+    "undefined_area_employment",
+    "county_count",
+    "gap_pct",
+    "share_not_in_a_county",
+]
 
 
 def compare(name, left, right, key):
@@ -142,6 +151,14 @@ def run_checks(cfg):
             "FROM qcew_annual WHERE agglvl_code = '51' AND industry_code = '10'",
             conn,
         )
+        undefined_db = pd.read_sql_query(
+            "SELECT q.year, substr(q.area_fips, 1, 2) AS state_fips, COUNT(*) AS undefined_rows, "
+            "SUM(q.employment) AS undefined_area_employment "
+            "FROM qcew_annual q JOIN dim_area a ON a.area_fips = q.area_fips "
+            "WHERE q.agglvl_code = '71' AND q.industry_code = '10' AND a.area_type = 'undefined' "
+            "GROUP BY q.year, substr(q.area_fips, 1, 2)",
+            conn,
+        )
         total_rows_db = conn.execute("SELECT COUNT(*) FROM qcew_annual").fetchone()[0]
 
         county_dbt = duck.execute(
@@ -153,8 +170,8 @@ def run_checks(cfg):
             "avg_weekly_wage, is_suppressed::INTEGER AS is_suppressed FROM mart_county_sector_year"
         ).df()
         state_dbt = duck.execute(
-            "SELECT year, state_fips, bls_state_employment, county_sum_employment, county_count, gap_pct "
-            "FROM mart_state_year"
+            "SELECT year, state_fips, bls_state_employment, county_sum_employment, undefined_area_employment, "
+            "county_count, gap_pct, share_not_in_a_county FROM mart_state_year"
         ).df()
         changes_dbt = duck.execute(
             "SELECT area_fips, year, employment_change, employment_change_pct, avg_weekly_wage_change_pct "
@@ -171,9 +188,15 @@ def run_checks(cfg):
             .reset_index()
         )
         state_db = state_totals_db.merge(sums, on=["state_fips", "year"], how="left")
-        state_db["gap_pct"] = (state_db["county_sum_employment"] - state_db["bls_state_employment"]) / state_db[
-            "bls_state_employment"
-        ].where(state_db["bls_state_employment"] > 0)
+        state_db = state_db.merge(undefined_db, on=["state_fips", "year"], how="left")
+        # no bucket row at all means no jobs in it, but a bucket row that BLS hid stays empty
+        state_db["undefined_area_employment"] = state_db["undefined_area_employment"].where(
+            state_db["undefined_rows"].notna(), 0.0
+        )
+        total = state_db["bls_state_employment"].where(state_db["bls_state_employment"] > 0)
+        in_counties_and_bucket = state_db["county_sum_employment"] + state_db["undefined_area_employment"]
+        state_db["gap_pct"] = (in_counties_and_bucket - state_db["bls_state_employment"]) / total
+        state_db["share_not_in_a_county"] = state_db["undefined_area_employment"] / total
         state_db = state_db[STATE_COLUMNS]
 
         results = [

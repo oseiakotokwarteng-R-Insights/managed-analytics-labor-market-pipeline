@@ -40,4 +40,12 @@ models:
       - name: bls_state_employment
         tests: [not_null]
       - name: county_sum_employment
+        description: Jobs in the named counties. A county BLS hid is left out of the sum.
         tests: [not_null]
+      - name: undefined_area_employment
+        description: Jobs BLS could not place in any single county ("unknown or undefined"). Zero when there is no such row.
+        tests: [non_negative]
+      - name: gap_pct
+        description: Counties plus that bucket, compared with the BLS state total, as a share of the total.
+      - name: share_not_in_a_county
+        description: How much of the state's jobs are in that bucket and so belong to no county.

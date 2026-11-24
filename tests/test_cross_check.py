@@ -5,7 +5,7 @@ import pytest
 
 from evaluation import cross_check_analytics as cc
 from qcew_pipeline import analytics, load, publish
-from tests.test_analytics import PROJECT, hide_one_sector_row
+from tests.test_analytics import PROJECT, hide_one_sector_row, publish_fake_data, with_an_undefined_bucket
 from tests.test_load import fake_sources, fresh_db
 
 duckdb = pytest.importorskip("duckdb")
@@ -81,3 +81,14 @@ def test_running_before_building_gives_a_clear_message(cfg, capsys, monkeypatch)
     assert cc.main([]) == 2
 
     assert "not found" in capsys.readouterr().err
+
+
+def test_the_state_check_counts_the_jobs_that_belong_to_no_county(cfg, refs, clean_df, monkeypatch, capsys):
+    refs2, df2 = with_an_undefined_bucket(refs, clean_df)
+    publish_fake_data(cfg, refs2, df2)
+    assert analytics.build_analytics(cfg, project_dir=PROJECT) is True
+    monkeypatch.setattr(cc, "load_config", lambda path=None: cfg)
+
+    assert cc.main([]) == 0
+
+    assert "Everything matches" in capsys.readouterr().out

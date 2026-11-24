@@ -4,9 +4,11 @@ and dbt and are skipped where those aren't installed. CI runs them."""
 import os
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from qcew_pipeline import analytics, load, publish
+from tests.conftest import make_row
 from tests.test_load import fake_sources, fresh_db
 
 duckdb = pytest.importorskip("duckdb")
@@ -144,3 +146,45 @@ def test_a_failed_build_leaves_the_database_file_free_to_open(cfg, refs, clean_d
     assert build(cfg) is True
     assert rows(cfg, "select count(*) from stg_area")[0][0] > 0
     assert build(cfg, select="mart_county_year") is True  # and it can be built into again
+
+
+def with_an_undefined_bucket(refs, df, include_bucket=True):
+    """Maryland, plus a bucket of jobs BLS could not place in any county (area 24999), as in the real data.
+    The state total is the counties plus the bucket."""
+    df = df.copy()
+    df.loc[df["area_fips"] == "24000", "employment"] = 350.0
+    refs = dict(refs)
+    bucket_area = pd.DataFrame({"area_fips": ["24999"], "area_title": ["Unknown Or Undefined, Maryland"]})
+    refs["area"] = pd.concat([refs["area"], bucket_area], ignore_index=True)
+    if include_bucket:
+        bucket = pd.DataFrame([make_row("24999", year, "71", "10", 50) for year in (2023, 2024)])[df.columns]
+        df = pd.concat([df, bucket], ignore_index=True)
+    return refs, df
+
+
+def test_jobs_that_belong_to_no_county_are_shown_separately_and_the_state_still_adds_up(cfg, refs, clean_df):
+    refs2, df2 = with_an_undefined_bucket(refs, clean_df)
+    publish_fake_data(cfg, refs2, df2)
+
+    assert build(cfg) is True
+
+    assert rows(cfg, "select count(*) from mart_county_year") == [(8,)]  # the bucket is not a county
+    assert rows(
+        cfg,
+        "select county_sum_employment, undefined_area_employment, bls_state_employment, gap_pct, "
+        "share_not_in_a_county from mart_state_year where state_name = 'Maryland' and year = 2024",
+    ) == [(300.0, 50.0, 350.0, pytest.approx(0.0), pytest.approx(50 / 350))]
+    assert rows(
+        cfg,
+        "select distinct undefined_area_employment from mart_state_year "
+        "where state_name in ('Virginia', 'District of Columbia')",
+    ) == [(0.0,)]
+
+
+def test_a_state_total_that_the_counties_and_the_bucket_cannot_explain_fails_the_build(cfg, refs, clean_df):
+    # The state says 350 jobs, but only 300 are in counties and the bucket is missing.
+    refs2, df2 = with_an_undefined_bucket(refs, clean_df, include_bucket=False)
+    publish_fake_data(cfg, refs2, df2)
+
+    assert build(cfg) is False
+    assert build(cfg, select="assert_county_sums_match_state_totals") is False
