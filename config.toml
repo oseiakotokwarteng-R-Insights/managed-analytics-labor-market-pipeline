@@ -45,6 +45,12 @@ timeout_seconds = 180
 # If the zip is already on disk, reuse it instead of downloading it again.
 reuse_existing_files = true
 
+[load]
+# If a load would remove more than this share of the rows already stored (for the same
+# years, states and sectors), stop and change nothing. A normal BLS revision touches a
+# handful of rows; losing a big chunk means something is wrong with the new file.
+max_removed_fraction = 0.05
+
 [validation]
 # A year with fewer filtered rows than this probably means something went wrong.
 min_rows_per_year = 3000

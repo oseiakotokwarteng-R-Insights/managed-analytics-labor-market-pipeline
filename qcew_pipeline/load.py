@@ -34,7 +34,18 @@ def connect(db_path):
 
 def init_schema(conn):
     conn.executescript(SCHEMA_FILE.read_text(encoding="utf-8"))
+    _add_missing_columns(conn)
     conn.commit()
+
+
+def _add_missing_columns(conn):
+    """Bring a database made by an older version up to date.
+
+    CREATE TABLE IF NOT EXISTS leaves an existing table alone, so a new column has to be added by hand.
+    """
+    have = {row[1] for row in conn.execute("PRAGMA table_info(pipeline_runs)")}
+    if "rows_removed" not in have:
+        conn.execute("ALTER TABLE pipeline_runs ADD COLUMN rows_removed INTEGER")
 
 
 # ---------------------------------------------------------------- run bookkeeping
@@ -49,7 +60,7 @@ def start_run(conn, years):
 def finish_run(conn, run_id, status, **fields):
     """Close out a run. Any extra keyword args must be column names of pipeline_runs."""
     allowed = {"rows_scanned", "rows_kept", "rows_inserted", "rows_changed", "rows_unchanged",
-               "validation_errors", "validation_warnings", "analytic_hash", "notes"}
+               "rows_removed", "validation_errors", "validation_warnings", "analytic_hash", "notes"}
     bad = set(fields) - allowed
     if bad:
         raise ValueError(f"Unknown run fields: {bad}")
@@ -102,18 +113,65 @@ def load_reference_tables(conn, refs, cfg):
 KEY = ["area_fips", "year", "own_code", "industry_code"]
 
 
+class TooManyRemovedError(Exception):
+    """Raised when a load would remove an unusually large share of the stored rows."""
+
+
+def _scope_filter(years, cfg):
+    """SQL and parameters that select the stored rows this run is responsible for:
+    the years it loaded, and only the states, ownership and levels in the config.
+    Narrowing the config later must never look like BLS deleting data."""
+    states, own, levels = cfg["state_fips"], cfg["ownership_codes"], cfg["agglvl_codes"]
+    sql = (f"year IN ({','.join('?' * len(years))}) "
+           f"AND substr(area_fips, 1, 2) IN ({','.join('?' * len(states))}) "
+           f"AND own_code IN ({','.join('?' * len(own))}) "
+           f"AND agglvl_code IN ({','.join('?' * len(levels))})")
+    return sql, [*years, *states, *own, *levels]
+
+
+def count_in_scope(conn, years, cfg):
+    """How many stored rows fall inside the run's years and configured scope."""
+    sql, params = _scope_filter(years, cfg)
+    return conn.execute(f"SELECT COUNT(*) FROM qcew_annual WHERE {sql}", params).fetchone()[0]
+
+
+def find_removed_rows(conn, df, years, cfg):
+    """Stored rows (same years and scope) that the new data no longer contains.
+
+    Returns (keys of removed rows, how many rows were stored in scope).
+    """
+    sql, params = _scope_filter(years, cfg)
+    stored = pd.read_sql_query(
+        f"SELECT area_fips, year, own_code, industry_code FROM qcew_annual WHERE {sql}", conn, params=params)
+    check = stored.merge(df[KEY], on=KEY, how="left", indicator=True)
+    removed = check.loc[check["_merge"] == "left_only", KEY]
+    return removed, len(stored)
+
+
 def _as_none(value):
     """sqlite3 wants None, not pandas NA/NaN, for NULL."""
     return None if pd.isna(value) else value
 
 
-def load_facts(conn, df, run_id, source_ids_by_year):
-    """Upsert the standardized rows. Returns counts of inserted / changed / unchanged rows.
+def load_facts(conn, df, run_id, source_ids_by_year, cfg):
+    """Upsert the standardized rows. Returns counts of inserted / changed / unchanged / removed rows.
+
+    "Removed" means a row that was stored from an earlier run but is no longer in what BLS
+    published. Those rows are copied to qcew_annual_removed and taken out of qcew_annual.
+    If that would remove too many rows (see max_removed_fraction in config.toml), nothing
+    is changed and TooManyRemovedError is raised.
 
     Everything happens in one transaction: if anything goes wrong, nothing is
     half-loaded.
     """
     years = sorted(int(y) for y in df["year"].unique())
+    removed_keys, stored_in_scope = find_removed_rows(conn, df, years, cfg)
+    n_removed = len(removed_keys)
+    max_fraction = cfg.get("load", {}).get("max_removed_fraction", 0.05)
+    if stored_in_scope and n_removed / stored_in_scope > max_fraction:
+        raise TooManyRemovedError(
+            f"{n_removed:,} of {stored_in_scope:,} stored rows ({n_removed / stored_in_scope:.1%}) are missing "
+            f"from the new data, more than the {max_fraction:.0%} limit. Nothing was changed.")
     existing = pd.read_sql_query(
         f"SELECT * FROM qcew_annual WHERE year IN ({','.join('?' * len(years))})",
         conn, params=years)
@@ -164,13 +222,28 @@ def load_facts(conn, df, run_id, source_ids_by_year):
     """
     try:
         conn.execute("BEGIN")
+        if n_removed:
+            key_params = [tuple(r) for r in removed_keys.astype({"year": int}).itertuples(index=False, name=None)]
+            conn.executemany(
+                """INSERT INTO qcew_annual_removed (area_fips, year, own_code, industry_code, agglvl_code,
+                       disclosure_code, is_suppressed, establishments, employment, total_wages,
+                       avg_weekly_wage, avg_annual_pay, source_file_id, last_run_id, removed_run_id, removed_at)
+                   SELECT area_fips, year, own_code, industry_code, agglvl_code,
+                          disclosure_code, is_suppressed, establishments, employment, total_wages,
+                          avg_weekly_wage, avg_annual_pay, source_file_id, last_run_id, ?, ?
+                   FROM qcew_annual
+                   WHERE area_fips = ? AND year = ? AND own_code = ? AND industry_code = ?""",
+                [(run_id, now_iso(), *k) for k in key_params])
+            conn.executemany(
+                "DELETE FROM qcew_annual WHERE area_fips = ? AND year = ? AND own_code = ? AND industry_code = ?",
+                key_params)
         conn.executemany(sql, records)
         conn.commit()
     except Exception:
         conn.rollback()
         raise
 
-    return {"inserted": n_inserted, "changed": n_changed, "unchanged": n_unchanged}
+    return {"inserted": n_inserted, "changed": n_changed, "unchanged": n_unchanged, "removed": n_removed}
 
 
 def analytic_hash(conn):

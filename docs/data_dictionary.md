@@ -40,6 +40,10 @@ Lookup tables loaded directly from BLS's published code files.
 | `dim_ownership` | `own_code`, `own_title` |
 | `dim_agglevel` | `agglvl_code`, `agglvl_title` |
 
+## `qcew_annual_removed`
+
+Rows that were once in `qcew_annual` but that BLS stopped publishing. They are moved here instead of being deleted, so nothing is lost. It has the same columns as `qcew_annual`, plus `removed_run_id` (the run that noticed) and `removed_at` (UTC time). There is no primary key, because a row can be removed, come back, and be removed again.
+
 ## `pipeline_runs`
 
 One row per run of the pipeline.
@@ -53,6 +57,7 @@ One row per run of the pipeline.
 | `rows_scanned` | Rows read from the national files. |
 | `rows_kept` | Rows left after filtering to DC/MD/VA, private, and the chosen aggregation levels. |
 | `rows_inserted`, `rows_changed`, `rows_unchanged` | What the load did. `rows_changed` counts existing rows whose values differ from what was already stored, which is how a BLS revision would show up. |
+| `rows_removed` | Stored rows (same years, states and sectors) that BLS no longer publishes. They are moved to `qcew_annual_removed`. |
 | `validation_errors`, `validation_warnings` | Counts of failed checks. |
 | `analytic_hash` | Fingerprint of the data in `qcew_annual` (ignores run ids and timestamps). Two runs with the same hash produced the same data. |
 | `notes` | Error message if the run failed. |

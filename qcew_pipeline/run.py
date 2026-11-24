@@ -103,31 +103,37 @@ def run_pipeline(cfg, years=None, refs=None):
         # ---- 4. load ----
         t = time.perf_counter()
         load.load_reference_tables(conn, refs, cfg)
-        counts = load.load_facts(conn, data, run_id, source_ids)
+        counts = load.load_facts(conn, data, run_id, source_ids, cfg)
         digest = load.analytic_hash(conn)
         timings["load"] = round(time.perf_counter() - t, 2)
 
         # Post-load sanity check: every row I meant to load should now be in the table.
-        in_db = conn.execute(
-            f"SELECT COUNT(*) FROM qcew_annual WHERE year IN ({','.join('?' * len(years))})", years
-        ).fetchone()[0]
+        in_db = load.count_in_scope(conn, years, cfg)
         if in_db != len(data):
             raise RuntimeError(f"Post-load check failed: expected {len(data)} rows, found {in_db}")
 
         timings["total"] = round(time.perf_counter() - t_total, 2)
         load.finish_run(conn, run_id, "success", rows_scanned=scanned, rows_kept=len(data),
                         rows_inserted=counts["inserted"], rows_changed=counts["changed"],
-                        rows_unchanged=counts["unchanged"],
+                        rows_unchanged=counts["unchanged"], rows_removed=counts["removed"],
                         validation_errors=summary["errors"],
                         validation_warnings=summary["warnings"], analytic_hash=digest)
-        log.info("=== run %d finished: %s inserted, %s changed, %s unchanged (%.1fs) ===",
+        log.info("=== run %d finished: %s inserted, %s changed, %s unchanged, %s removed (%.1fs) ===",
                  run_id, f"{counts['inserted']:,}", f"{counts['changed']:,}",
-                 f"{counts['unchanged']:,}", timings["total"])
+                 f"{counts['unchanged']:,}", f"{counts['removed']:,}", timings["total"])
+        if counts["removed"]:
+            log.warning("%s stored rows are no longer published by BLS. They were moved to "
+                        "qcew_annual_removed.", f"{counts['removed']:,}")
         result.update(status="success", load=counts, analytic_hash=digest, validation=summary,
                       rows_loaded=len(data), rows_scanned=scanned,
                       checks=[c.as_dict() for c in checks])
         return result
 
+    except load.TooManyRemovedError as err:
+        log.error("%s", err)
+        load.finish_run(conn, run_id, "failed_validation", notes=str(err))
+        result.update(status="failed_validation", error=str(err))
+        return result
     except collect.DownloadError as err:
         log.error("Download problem: %s", err)
         load.finish_run(conn, run_id, "failed", notes=f"Download problem: {err}")

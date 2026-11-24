@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     rows_inserted       INTEGER,
     rows_changed        INTEGER,           -- existing rows whose values were different this time
     rows_unchanged      INTEGER,
+    rows_removed        INTEGER,           -- stored rows BLS no longer published; moved to qcew_annual_removed
     validation_errors   INTEGER,
     validation_warnings INTEGER,
     analytic_hash       TEXT,              -- fingerprint of the data tables, for reproducibility checks
@@ -86,6 +87,28 @@ CREATE TABLE IF NOT EXISTS qcew_annual (
     source_file_id  INTEGER REFERENCES source_files(source_file_id),
     last_run_id     INTEGER REFERENCES pipeline_runs(run_id),
     PRIMARY KEY (area_fips, year, own_code, industry_code)
+);
+
+-- Rows that were in the database but that BLS stopped publishing. They are moved here,
+-- not deleted outright, so the history is never lost. No primary key: a row can be
+-- removed, come back, and be removed again.
+CREATE TABLE IF NOT EXISTS qcew_annual_removed (
+    area_fips       TEXT NOT NULL,
+    year            INTEGER NOT NULL,
+    own_code        TEXT NOT NULL,
+    industry_code   TEXT NOT NULL,
+    agglvl_code     TEXT NOT NULL,
+    disclosure_code TEXT,
+    is_suppressed   INTEGER NOT NULL,
+    establishments  REAL,
+    employment      REAL,
+    total_wages     REAL,
+    avg_weekly_wage REAL,
+    avg_annual_pay  REAL,
+    source_file_id  INTEGER,
+    last_run_id     INTEGER,
+    removed_run_id  INTEGER NOT NULL REFERENCES pipeline_runs(run_id),
+    removed_at      TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_qcew_year_industry ON qcew_annual (year, industry_code);

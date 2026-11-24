@@ -41,3 +41,8 @@ SELECT run_id, started_at, status, rows_inserted, rows_changed, rows_unchanged,
        validation_errors, validation_warnings
 FROM pipeline_runs
 ORDER BY run_id DESC;
+
+-- 7. Which rows did BLS stop publishing, and when did we notice?
+SELECT removed_run_id, removed_at, area_fips, year, industry_code, employment
+FROM qcew_annual_removed
+ORDER BY removed_at DESC;
