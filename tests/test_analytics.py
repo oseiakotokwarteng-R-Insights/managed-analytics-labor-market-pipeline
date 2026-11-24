@@ -143,4 +143,4 @@ def test_a_failed_build_leaves_the_database_file_free_to_open(cfg, refs, clean_d
     publish_fake_data(cfg, refs, clean_df)
     assert build(cfg) is True
     assert rows(cfg, "select count(*) from stg_area")[0][0] > 0
-    assert build(cfg, select="mart_county_year") is True        # and it can be built into again
+    assert build(cfg, select="mart_county_year") is True  # and it can be built into again

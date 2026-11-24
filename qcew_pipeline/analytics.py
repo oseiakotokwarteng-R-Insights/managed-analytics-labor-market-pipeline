@@ -89,7 +89,7 @@ def build_analytics(cfg, project_dir=None, select=None):
         **os.environ,
         "QCEW_LAKE_DIR": lake.as_posix(),
         "QCEW_ANALYTICS_DB": db.as_posix(),
-        "DBT_SEND_ANONYMOUS_USAGE_STATS": "False",     # don't send usage statistics anywhere
+        "DBT_SEND_ANONYMOUS_USAGE_STATS": "False",  # don't send usage statistics anywhere
     }
     done = subprocess.run([sys.executable, "-c", _DBT_RUNNER, *args], env=environment, check=False)
     if done.returncode == 2:
