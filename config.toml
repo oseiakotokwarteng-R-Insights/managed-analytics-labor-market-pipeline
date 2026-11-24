@@ -39,7 +39,7 @@ output_dir = "outputs"
 # BLS asks automated users to identify themselves. If you want to put your own
 # contact info in here, set the QCEW_USER_AGENT environment variable instead of
 # editing this file, so it never ends up in the repository.
-user_agent = "qcew-dmv-pipeline/0.1 (student capstone project)"
+user_agent = "qcew-pipeline/0.2 (Managed Analytics; contact info@managedanalytics.co)"
 retries = 3
 timeout_seconds = 180
 # If the zip is already on disk, reuse it instead of downloading it again.

@@ -32,5 +32,5 @@ flowchart LR
 * **Fail the whole run if one year fails.** If a download or a check fails for one year, nothing is loaded. A multi-year table with a silent hole in it would be worse than no new data.
 * **Validate before loading.** The database only ever contains data that passed the error-level checks.
 * **Upsert, not append.** Re-running can't create duplicates, and changed values are counted so BLS revisions are visible.
-* **One main source.** Only QCEW, to keep the scope realistic for a five-week capstone. The state-total rows in the same file are used as an independent cross-check on the county rows.
+* **One main source.** Only QCEW. The state-total rows in the same file are used as an independent cross-check on the county rows.
 * **Private sector only.** Government employment is covered and paid differently, so mixing it in would make county comparisons harder to interpret.
