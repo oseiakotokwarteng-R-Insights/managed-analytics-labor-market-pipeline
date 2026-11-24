@@ -1,38 +1,42 @@
 # Managed Analytics: Labor Market Data Pipeline
 
-A pipeline that takes public employment and wage data from the Bureau of Labor Statistics (BLS), cleans it, checks it, and saves it in a database anyone can query. It is a sample project from [Managed Analytics](https://managedanalytics.co), built on public data so the work can be inspected.
+This project takes job and wage numbers that the Bureau of Labor Statistics (BLS) gives away for free, cleans them up, checks them, and saves them in one small database that anyone can ask questions of. It's a sample project from [Managed Analytics](https://managedanalytics.co). I built it on public data so you can look at every step.
 
-The numbers come from the Quarterly Census of Employment and Wages (QCEW), which counts jobs and wages at businesses, county by county.
+The numbers come from a BLS program called the Quarterly Census of Employment and Wages, or QCEW for short. It counts jobs, businesses and wages, county by county. This project covers Washington DC, Maryland and Virginia, and private-sector jobs only.
 
-## Where this came from
+## Where it came from
 
-This project starts from a pipeline I built for a graduate capstone: [dmv_labor_market_pipeline](https://github.com/oseiakotokwarteng-R-Insights/dmv_labor_market_pipeline). That repository stays as it is. This one takes the same code and keeps building on it, so it can do what a client project would need.
+I first built this pipeline for a graduate school capstone: [dmv_labor_market_pipeline](https://github.com/oseiakotokwarteng-R-Insights/dmv_labor_market_pipeline). That repository stays the way it is. Here I'm taking the same code and making it do what a real client project would need.
 
-## What it does today
+## What it does
 
-The starting code does four things in order:
+It does four things, one after the other:
 
-1. **Collect** the annual BLS files, with retries, and record where each file came from and its SHA-256 fingerprint.
-2. **Transform** the huge national files into a small table for the chosen states. Values BLS hides for privacy are stored as blank, never as zero.
-3. **Validate** with 16 checks. A real error stops the run and nothing is saved.
-4. **Load** into SQLite. Running it twice does not create duplicates, and changed numbers are counted.
+1. **Collect.** It downloads each year's file from BLS and tries again if a download fails. It writes down where each file came from, when it was downloaded, and a short code (a SHA-256 hash) that's unique to that file, so anyone can check they have the exact same one.
+2. **Transform.** The national files are huge, about 3.6 million rows a year. It reads them in pieces and keeps only the rows I need. When BLS hides a number to protect a business's privacy, I leave it blank. I never turn it into a zero.
+3. **Validate.** It runs 16 checks. If one finds a real error, the run stops and nothing gets saved.
+4. **Load.** It saves everything into a SQLite database in one go. Running it twice doesn't create duplicates. If BLS changes a number it already published, I count it. If BLS stops publishing a row, that row moves to a separate table, so nothing quietly disappears.
 
-It is tested (91 automated tests plus a script that breaks the data on purpose to see whether the checks notice) and runs the same way on Windows and Linux.
+By default it works out the newest year BLS has published and pulls that year plus the four before it. Right now that means 2021 to 2025. When BLS publishes 2026, it will move to 2022 to 2026 on its own. Years that drop out of the window stay in the database. They just stop being refreshed.
 
-## What I am adding
+## A real run
 
-| Phase | What | Status |
-|---|---|---|
-| 1 | Harden it: catch rows BLS removes (done), alert when new data is published (done), handle bigger data (done), fill the test gaps (done), follow the newest year automatically (done), packaging, Docker, style and type checks in CI | In progress |
-| 2 | An analytics layer: Parquet files, then DuckDB and dbt models with tests | Planned |
-| 3 | Orchestration with Dagster, and email alerts | Planned |
-| 4 | More sources, including a check of one source against another, and a second region (California) set only by configuration | Planned |
-| 5 | A small dashboard for non-technical users | Planned |
-| 6 | An employment forecast, compared with simple baselines and tested on data it has not seen | Planned |
+I ran it in Google Colab from a fresh copy of this repository. It downloaded the five files, read about 17.7 million rows, and kept 16,262 of them. That took about 140 seconds, and all 16 checks passed. I ran it a second time right after. It found nothing to insert, nothing changed, and nothing removed, and it took 82 seconds because the files were already on disk. Both runs ended with the same data fingerprint, so the second run rebuilt exactly what the first one saved. All 92 automated tests passed there too.
+
+One thing I noticed: the share of values BLS hides keeps going up. It was about 24% in 2021 and 2022, 28% in 2024, and 36% in 2025. The 2025 file also has about 16% fewer rows nationally than 2024. I don't know why yet. The pipeline records these numbers but doesn't stop for them. I want to add warnings for jumps like this.
+
+## What I'm working on
+
+1. **Make it sturdier.** Mostly done. It now notices rows BLS removes, loads faster, follows the newest year by itself, runs in Docker, and has style and type checks. Still to add: warnings when the data suddenly changes shape, like the jump above.
+2. **An analytics layer.** Parquet files, then DuckDB and dbt models with tests.
+3. **Scheduling and alerts.** Dagster to run it on a schedule, and an email when something needs attention.
+4. **More sources.** A second source, checks between the two, and California added by changing a setting instead of the code.
+5. **A small dashboard** for people who don't want to write SQL.
+6. **A forecast** of employment, compared against simple baselines and tested on data it hasn't seen.
 
 ## Try it
 
-You need Python 3.11 or newer.
+You need Python 3.11 or newer. Then run these two commands:
 
 ```bash
 pip install -e .
@@ -42,7 +46,7 @@ pip install -e .
 qcew-run --export
 ```
 
-The second command works out the newest year BLS has published, then downloads the five most recent yearly files (2021 to 2025 today, about 390 MB in total) and builds the database. The `data/` and `outputs/` folders appear in the folder you run it from. Set `QCEW_RAW_DIR` to keep the downloads somewhere else.
+The second one works out the newest year, downloads the five most recent files (about 390 MB in total), and builds the database. A `data` folder and an `outputs` folder show up in the folder you ran it from. If you'd rather keep the big downloads somewhere else, set `QCEW_RAW_DIR` to that folder.
 
 ### With Docker
 
@@ -51,26 +55,32 @@ docker build -t qcew-pipeline .
 docker run --rm -v "$PWD/data:/app/data" -v "$PWD/outputs:/app/outputs" qcew-pipeline
 ```
 
-The database ends up in `./data` and the logs and CSV files in `./outputs`. Anything you add after the image name goes to the program, for example `--years 2025`.
+The database ends up in `./data` and the logs and CSV files in `./outputs`. Anything you type after the image name goes to the program, like `--years 2025`.
 
-## For developers
+### Checking for new data
+
+```bash
+qcew-check-updates
+```
+
+That asks BLS which year is the newest. GitHub also runs this check once a month and opens an issue when there's a year it hasn't told me about yet. I haven't seen that part run on GitHub yet.
+
+### If you want to work on the code
 
 ```bash
 pip install -e ".[dev]"
-python -m pytest -q        # the tests
-ruff check .               # style and common mistakes
-mypy                       # type checks
+python -m pytest -q
+ruff check .
+mypy
 ```
 
-GitHub runs all of these, and checks that the Docker image builds and starts, on every push, so you do not have to run them yourself.
+GitHub runs all of these on every push, and it checks that the Docker image builds and starts, so you don't have to run them yourself.
 
-## Settings
+The settings, like the states and how many years to pull, are in [`qcew_pipeline/config.toml`](qcew_pipeline/config.toml). There's a diagram and a list of the choices I made in [`docs/architecture.md`](docs/architecture.md), and [`docs/data_dictionary.md`](docs/data_dictionary.md) explains every table in plain words.
 
-Settings such as the states and the length of the year window are in [`qcew_pipeline/config.toml`](qcew_pipeline/config.toml). By default the pipeline follows the newest published year: the window is always the most recent five years, ending with the newest, and it moves forward by itself when BLS publishes a new year. Years that drop out of the window stay in the database. There is a diagram and a list of design choices in [`docs/architecture.md`](docs/architecture.md), and every table is described in [`docs/data_dictionary.md`](docs/data_dictionary.md).
+## Where the data comes from
 
-## Data
-
-Bureau of Labor Statistics, Quarterly Census of Employment and Wages, from <https://www.bls.gov/cew/>. It is public government data and contains no personal information. The numbers in the database are the ones BLS published. This project only filters them, adds names to the codes, and checks them.
+The Bureau of Labor Statistics, Quarterly Census of Employment and Wages, from <https://www.bls.gov/cew/>. It's public government data and has no personal information in it. The numbers in my database are the ones BLS published. All I do is filter them, add names to the codes, and check them.
 
 ## License
 
