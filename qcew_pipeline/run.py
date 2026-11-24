@@ -152,7 +152,7 @@ def run_pipeline(cfg, years=None, refs=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Run the QCEW DMV data pipeline.")
-    parser.add_argument("--config", help="path to a config.toml (default: the one in the project)")
+    parser.add_argument("--config", help="path to a config.toml (default: the one inside the package)")
     parser.add_argument("--years", nargs="+", type=int, help="override the years in the config")
     parser.add_argument("--export", action="store_true", help="write CSV exports after a successful run")
     args = parser.parse_args(argv)

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .transform import MEASURES, area_type
 
-SCHEMA_FILE = Path(__file__).resolve().parent.parent / "sql" / "schema.sql"
+SCHEMA_FILE = Path(__file__).resolve().parent / "schema.sql"
 
 
 def now_iso():

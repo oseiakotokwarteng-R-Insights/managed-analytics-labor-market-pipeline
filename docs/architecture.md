@@ -17,7 +17,10 @@ flowchart LR
 
 | File | Job |
 |---|---|
-| `config.toml` | The settings: which years, states, ownership, tolerances, file locations. |
+| `qcew_pipeline/config.toml` | The settings: which years, states, ownership, tolerances, file locations. Ships inside the package. |
+| `qcew_pipeline/schema.sql` | The database layout (also ships inside the package). |
+| `pyproject.toml` | Packaging (installs `qcew-run` and `qcew-check-updates`), plus the settings for pytest, ruff and mypy. |
+| `Dockerfile` | Runs the pipeline in a container. Built and smoke-tested in CI. |
 | `qcew_pipeline/years.py` | Works out which years to pull. With `years = "auto"` it asks BLS (header requests only) for the newest published year and uses the most recent `window_years` years ending there. |
 | `qcew_pipeline/collect.py` | Downloads the annual zips (with retries) and BLS lookup tables, and records each file's size and SHA-256 fingerprint. |
 | `qcew_pipeline/transform.py` | Reads each national file in chunks, keeps only the rows I want, renames columns, fixes types, and turns suppressed values into NULL. |
@@ -26,7 +29,7 @@ flowchart LR
 | `qcew_pipeline/run.py` | Runs all steps in order with logging and timing, and decides what to do on failure. |
 | `qcew_pipeline/export.py` | Writes CSVs from the database. |
 | `qcew_pipeline/check_updates.py` | Asks BLS (header request only) whether a newer annual file exists. Exits with 2 if BLS can't be reached, so a broken check is never mistaken for 'no news'. |
-| `.github/workflows/pipeline.yml` | Runs tests on every push, checks for new data monthly and opens a GitHub issue (once per year of data) when there is some, and can run the pipeline on demand. |
+| `.github/workflows/pipeline.yml` | Runs style, type and unit checks and a Docker build on every push, checks for new data monthly and opens a GitHub issue (once per year of data) when there is some, and can run the pipeline on demand. |
 
 ## Decisions worth knowing about
 

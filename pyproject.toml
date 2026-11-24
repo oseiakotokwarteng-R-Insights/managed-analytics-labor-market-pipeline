@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qcew-pipeline"
+version = "0.2.0"
+description = "A tested pipeline that turns public BLS employment and wage data (QCEW) into a validated, queryable database."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Osei Akoto Kwarteng" }]
+keywords = ["data engineering", "etl", "bls", "qcew", "labor market"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = ["pandas>=2.2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11", "pandas-stubs"]
+
+[project.scripts]
+qcew-run = "qcew_pipeline.run:main"
+qcew-check-updates = "qcew_pipeline.check_updates:main"
+
+[project.urls]
+Source = "https://github.com/oseiakotokwarteng-R-Insights/managed-analytics-labor-market-pipeline"
+Homepage = "https://managedanalytics.co"
+
+[tool.setuptools]
+packages = ["qcew_pipeline"]
+
+[tool.setuptools.package-data]
+qcew_pipeline = ["config.toml", "schema.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["qcew_pipeline"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true

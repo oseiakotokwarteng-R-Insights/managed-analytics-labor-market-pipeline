@@ -1,12 +1,15 @@
-"""Reads config.toml and works out where files should live."""
+"""Reads config.toml and works out where files should live.
+
+The default settings ship inside the package (qcew_pipeline/config.toml). Folders in the settings are
+relative to the folder you run the program from, so `data/` and `outputs/` appear where you are working.
+Pass --config to use your own settings file, or set the QCEW_* environment variables.
+"""
 
 import os
 import tomllib
 from pathlib import Path
 
-# The project folder is one level up from this file.
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CONFIG = PROJECT_ROOT / "config.toml"
+DEFAULT_CONFIG = Path(__file__).resolve().parent / "config.toml"
 
 
 def load_config(path=None):
@@ -28,7 +31,7 @@ def load_config(path=None):
     for key, env_value in env_overrides.items():
         value = env_value or paths[key]
         p = Path(value)
-        paths[key] = p if p.is_absolute() else PROJECT_ROOT / p
+        paths[key] = p if p.is_absolute() else Path.cwd() / p
 
     # Allow the user agent to come from the environment so my contact details
     # don't have to live in a file that gets pushed to GitHub.

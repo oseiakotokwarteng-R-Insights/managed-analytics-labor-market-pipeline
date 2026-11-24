@@ -23,7 +23,7 @@ It is tested (91 automated tests plus a script that breaks the data on purpose t
 
 | Phase | What | Status |
 |---|---|---|
-| 1 | Harden it: catch rows BLS removes (done), alert when new data is published (done), handle bigger data (done), fill the test gaps (done), follow the newest year automatically (done), Docker, packaging | In progress |
+| 1 | Harden it: catch rows BLS removes (done), alert when new data is published (done), handle bigger data (done), fill the test gaps (done), follow the newest year automatically (done), packaging, Docker, style and type checks in CI | In progress |
 | 2 | An analytics layer: Parquet files, then DuckDB and dbt models with tests | Planned |
 | 3 | Orchestration with Dagster, and email alerts | Planned |
 | 4 | More sources, including a check of one source against another, and a second region (California) set only by configuration | Planned |
@@ -35,21 +35,38 @@ It is tested (91 automated tests plus a script that breaks the data on purpose t
 You need Python 3.11 or newer.
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ```bash
-python -m qcew_pipeline.run --export
+qcew-run --export
 ```
 
-The second command works out the newest year BLS has published, then downloads the five most recent yearly files (2021 to 2025 today, about 390 MB in total) and builds the database. Set `QCEW_RAW_DIR` to keep the downloads outside the project folder. To run the tests:
+The second command works out the newest year BLS has published, then downloads the five most recent yearly files (2021 to 2025 today, about 390 MB in total) and builds the database. The `data/` and `outputs/` folders appear in the folder you run it from. Set `QCEW_RAW_DIR` to keep the downloads somewhere else.
+
+### With Docker
 
 ```bash
-pip install -r requirements-dev.txt
-python -m pytest -q
+docker build -t qcew-pipeline .
+docker run --rm -v "$PWD/data:/app/data" -v "$PWD/outputs:/app/outputs" qcew-pipeline
 ```
 
-Settings such as the states and the length of the year window are in [`config.toml`](config.toml). By default the pipeline follows the newest published year: the window is always the most recent five years, ending with the newest, and it moves forward by itself when BLS publishes a new year. Years that drop out of the window stay in the database. There is a diagram and a list of design choices in [`docs/architecture.md`](docs/architecture.md), and every table is described in [`docs/data_dictionary.md`](docs/data_dictionary.md).
+The database ends up in `./data` and the logs and CSV files in `./outputs`. Anything you add after the image name goes to the program, for example `--years 2025`.
+
+## For developers
+
+```bash
+pip install -e ".[dev]"
+python -m pytest -q        # the tests
+ruff check .               # style and common mistakes
+mypy                       # type checks
+```
+
+GitHub runs all of these, and checks that the Docker image builds and starts, on every push, so you do not have to run them yourself.
+
+## Settings
+
+Settings such as the states and the length of the year window are in [`qcew_pipeline/config.toml`](qcew_pipeline/config.toml). By default the pipeline follows the newest published year: the window is always the most recent five years, ending with the newest, and it moves forward by itself when BLS publishes a new year. Years that drop out of the window stay in the database. There is a diagram and a list of design choices in [`docs/architecture.md`](docs/architecture.md), and every table is described in [`docs/data_dictionary.md`](docs/data_dictionary.md).
 
 ## Data
 
