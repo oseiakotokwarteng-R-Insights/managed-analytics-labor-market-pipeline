@@ -31,8 +31,15 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - run: pip install -e ".[dev]"
-      - run: ruff check .
-      - run: ruff format --check .
+      - name: Style and common mistakes
+        run: ruff check . --output-format=github
+      - name: Formatting
+        run: |
+          status=0
+          ruff format --check . > format.txt 2>&1 || status=$?
+          cat format.txt
+          sed -n 's/^Would reformat: \(.*\)$/::error file=::Not formatted the way ruff format writes it/p' format.txt
+          exit $status
 
   typecheck:
     if: github.event_name != 'schedule'
@@ -45,7 +52,13 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - run: pip install -e ".[dev]"
-      - run: mypy
+      - name: Type check
+        run: |
+          status=0
+          mypy --no-color-output --no-error-summary > mypy.txt 2>&1 || status=$?
+          cat mypy.txt
+          sed -n -E 's#^([^:]+):([0-9]+): error: (.*)$#::error file=,line=::#p' mypy.txt
+          exit $status
 
   test:
     if: github.event_name != 'schedule'
