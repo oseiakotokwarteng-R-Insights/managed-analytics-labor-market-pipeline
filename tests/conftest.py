@@ -21,6 +21,7 @@ from qcew_pipeline.transform import OUTPUT_COLUMNS  # noqa: E402
 @pytest.fixture
 def cfg(tmp_path):
     cfg = load_config()
+    cfg["years"] = [2023, 2024]            # a fixed list, so the tests never ask BLS which year is newest
     cfg["paths"]["db_path"] = tmp_path / "test.sqlite"
     cfg["paths"]["raw_dir"] = tmp_path / "raw"
     cfg["paths"]["output_dir"] = tmp_path / "out"

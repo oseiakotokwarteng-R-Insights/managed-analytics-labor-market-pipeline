@@ -35,4 +35,16 @@ def load_config(path=None):
     if os.environ.get("QCEW_USER_AGENT"):
         cfg["download"]["user_agent"] = os.environ["QCEW_USER_AGENT"]
 
+    _check_years(cfg)
     return cfg
+
+
+def _check_years(cfg):
+    """Fail early, with a plain message, if the years setting is something the pipeline can't use."""
+    years = cfg.get("years")
+    if years == "auto":
+        window = cfg.get("window_years")
+        if not isinstance(window, int) or isinstance(window, bool) or window < 1:
+            raise ValueError('window_years must be a whole number of 1 or more when years = "auto".')
+    elif not (isinstance(years, list) and years and all(isinstance(y, int) for y in years)):
+        raise ValueError('years must be "auto" or a list of years such as [2022, 2023, 2024].')

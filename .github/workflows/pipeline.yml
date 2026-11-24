@@ -49,13 +49,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           YEAR: ${{ steps.check.outputs.year }}
+          WINDOW: ${{ steps.check.outputs.window }}
         run: |
-          title="New QCEW annual file published: $YEAR"
-          existing=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq 'length')
+          title="QCEW annual file available: $YEAR"
+          # --state all: one issue per year, ever, even after the issue has been closed
+          existing=$(gh issue list --state all --search "\"$title\" in:title" --json number --jq 'length')
           if [ "$existing" = "0" ]; then
-            gh issue create --title "$title" --body "BLS has published the $YEAR annual QCEW file. To load it, add $YEAR to \`years\` in \`config.toml\` and run \`python -m qcew_pipeline.run --export\`. The usual checks run on it before anything is saved. This issue was opened automatically by the monthly check."
+            gh issue create --title "$title" --body "BLS has published the $YEAR annual QCEW file. The pipeline follows the newest year automatically, so the next run (\`python -m qcew_pipeline.run --export\`) will pull $WINDOW. The usual checks run before anything is saved. This issue was opened automatically by the monthly check."
           else
-            echo "An open issue for $YEAR already exists. Nothing to do."
+            echo "An issue for $YEAR already exists. Nothing to do."
           fi
 
   run-pipeline:

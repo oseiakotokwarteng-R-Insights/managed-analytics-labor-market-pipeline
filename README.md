@@ -17,13 +17,13 @@ The starting code does four things in order:
 3. **Validate** with 16 checks. A real error stops the run and nothing is saved.
 4. **Load** into SQLite. Running it twice does not create duplicates, and changed numbers are counted.
 
-It is tested (43 automated tests plus a script that breaks the data on purpose to see whether the checks notice) and runs the same way on Windows and Linux.
+It is tested (91 automated tests plus a script that breaks the data on purpose to see whether the checks notice) and runs the same way on Windows and Linux.
 
 ## What I am adding
 
 | Phase | What | Status |
 |---|---|---|
-| 1 | Harden it: catch rows BLS removes (done), alert when new data is published (done), handle bigger data (done), more tests, Docker, packaging | In progress |
+| 1 | Harden it: catch rows BLS removes (done), alert when new data is published (done), handle bigger data (done), fill the test gaps (done), follow the newest year automatically (done), Docker, packaging | In progress |
 | 2 | An analytics layer: Parquet files, then DuckDB and dbt models with tests | Planned |
 | 3 | Orchestration with Dagster, and email alerts | Planned |
 | 4 | More sources, including a check of one source against another, and a second region (California) set only by configuration | Planned |
@@ -42,14 +42,14 @@ pip install -r requirements.txt
 python -m qcew_pipeline.run --export
 ```
 
-The second command downloads five yearly files from BLS (about 390 MB in total) and builds the database. Set `QCEW_RAW_DIR` to keep the downloads outside the project folder. To run the tests:
+The second command works out the newest year BLS has published, then downloads the five most recent yearly files (2021 to 2025 today, about 390 MB in total) and builds the database. Set `QCEW_RAW_DIR` to keep the downloads outside the project folder. To run the tests:
 
 ```bash
 pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
-Settings such as the years and states are in [`config.toml`](config.toml). There is a diagram and a list of design choices in [`docs/architecture.md`](docs/architecture.md), and every table is described in [`docs/data_dictionary.md`](docs/data_dictionary.md).
+Settings such as the states and the length of the year window are in [`config.toml`](config.toml). By default the pipeline follows the newest published year: the window is always the most recent five years, ending with the newest, and it moves forward by itself when BLS publishes a new year. Years that drop out of the window stay in the database. There is a diagram and a list of design choices in [`docs/architecture.md`](docs/architecture.md), and every table is described in [`docs/data_dictionary.md`](docs/data_dictionary.md).
 
 ## Data
 

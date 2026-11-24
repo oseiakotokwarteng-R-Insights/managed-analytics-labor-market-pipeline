@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from qcew_pipeline import collect, load, transform, validate  # noqa: E402
 from qcew_pipeline.config import load_config  # noqa: E402
+from qcew_pipeline.years import resolve_years  # noqa: E402
 from qcew_pipeline.run import run_pipeline, setup_logging  # noqa: E402
 
 
@@ -276,6 +277,7 @@ def write_markdown(res, path):
 
 def main():
     cfg = load_config()
+    cfg["years"] = resolve_years(cfg)       # the evaluation needs the actual list of years
     out_dir = Path(cfg["paths"]["output_dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
     setup_logging(out_dir, "evaluation_" + time.strftime("%Y%m%d_%H%M%S"))

@@ -3,7 +3,13 @@
 # this is the file to edit. The code itself shouldn't need to change.
 
 # Which annual files to pull. QCEW annual files come out about a year after the data year.
-years = [2020, 2021, 2022, 2023, 2024]
+#
+# "auto" asks BLS which year is the newest and pulls the most recent `window_years` years up to
+# and including it. When BLS publishes a new year, the window moves forward on its own, and the
+# years that drop out of the window stay in the database (they just stop being refreshed).
+# For a fixed set instead, use a list, for example: years = [2022, 2023, 2024]
+years = "auto"
+window_years = 5
 
 # State FIPS codes: 11 = District of Columbia, 24 = Maryland, 51 = Virginia
 state_fips = ["11", "24", "51"]

@@ -17,7 +17,8 @@ flowchart LR
 
 | File | Job |
 |---|---|
-| `config.toml` | The settings: years, states, ownership, tolerances, file locations. |
+| `config.toml` | The settings: which years, states, ownership, tolerances, file locations. |
+| `qcew_pipeline/years.py` | Works out which years to pull. With `years = "auto"` it asks BLS (header requests only) for the newest published year and uses the most recent `window_years` years ending there. |
 | `qcew_pipeline/collect.py` | Downloads the annual zips (with retries) and BLS lookup tables, and records each file's size and SHA-256 fingerprint. |
 | `qcew_pipeline/transform.py` | Reads each national file in chunks, keeps only the rows I want, renames columns, fixes types, and turns suppressed values into NULL. |
 | `qcew_pipeline/validate.py` | Runs the checks. Errors block the load; warnings get recorded. |
@@ -31,6 +32,7 @@ flowchart LR
 
 * **Fail the whole run if one year fails.** If a download or a check fails for one year, nothing is loaded. A multi-year table with a silent hole in it would be worse than no new data.
 * **Validate before loading.** The database only ever contains data that passed the error-level checks.
+* **A rolling window of years.** By default the pipeline pulls the five most recent years and always includes the newest one BLS has published, so a new release is picked up without editing anything. Years that fall out of the window stay in the database and are simply no longer refreshed. Pin a fixed list in `config.toml` when you need a frozen, reproducible set.
 * **Stage, then compare inside the database.** The new rows are copied into a temporary table and SQLite does the comparing and the upsert as set operations. The stored table is never read into pandas and there is no row-by-row Python loop. On 600,000 made-up rows (about four times the real DMV data) a rerun took 7.6 s instead of 22.5 s, and a typical revision 9.5 s instead of 21.3 s (`python evaluation/benchmark_load.py --rows 600000`). The new rows themselves are still held in memory, so there is a ceiling; the next step past it would be loading year by year.
 * **Upsert, not append.** Re-running can't create duplicates, and changed values are counted so BLS revisions are visible.
 * **Removed rows are archived, not ignored.** If BLS stops publishing a row, it moves to `qcew_annual_removed` and is counted on the run. Only rows for the years, states and sectors in the run are considered, so narrowing `config.toml` never looks like BLS deleting data.

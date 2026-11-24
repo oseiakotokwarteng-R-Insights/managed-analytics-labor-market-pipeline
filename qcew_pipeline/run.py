@@ -20,6 +20,7 @@ import pandas as pd
 
 from . import collect, load, transform, validate
 from .config import load_config
+from .years import CheckError, resolve_years
 
 log = logging.getLogger("qcew")
 
@@ -43,7 +44,7 @@ def run_pipeline(cfg, years=None, refs=None):
     """Run every step. Returns a dict of results and timings (and never raises for
     expected problems like a failed download; those show up as status = 'failed').
     """
-    years = list(years or cfg["years"])
+    years = list(years) if years else resolve_years(cfg)
     timings = {}
     result = {"years": years, "status": "failed", "timings_seconds": timings}
     t_total = time.perf_counter()
@@ -159,7 +160,13 @@ def main(argv=None):
     cfg = load_config(args.config)
     stamp = time.strftime("%Y%m%d_%H%M%S")
     log_file = setup_logging(cfg["paths"]["output_dir"], stamp)
-    result = run_pipeline(cfg, args.years)
+    try:
+        years = args.years or resolve_years(cfg)
+    except CheckError as err:
+        log.error("Could not work out which years to pull: %s", err)
+        return 2
+    log.info("years for this run: %s-%s", years[0], years[-1])
+    result = run_pipeline(cfg, years)
 
     report = Path(cfg["paths"]["output_dir"]) / f"run_summary_{stamp}.json"
     report.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
