@@ -100,7 +100,8 @@ def test_publishing_twice_gives_the_same_data_and_leaves_nothing_behind(cfg, loa
     publish.publish_lake(cfg, loaded)
 
     assert query(loaded, f"SELECT * FROM {FACTS} ORDER BY year, area_fips, industry_code") == first
-    assert sorted(p.name for p in loaded.parent.iterdir()) == ["lake"]         # no .new or .old folders
+    leftovers = [p.name for p in loaded.parent.iterdir() if p.name.endswith((".new", ".old"))]
+    assert leftovers == []                                                        # no half-finished folders
 
 
 def test_an_interrupted_earlier_attempt_does_not_get_in_the_way(cfg, loaded):

@@ -133,15 +133,14 @@ def publish_lake(cfg, out_dir=None):
     duck = duckdb.connect()
     try:
         partitions = {}
+        total_rows = 0
         for year, group in groupby(fact_rows, key=lambda row: row[0]):
             rows = [row[1:] for row in group]
             relative = f"qcew_annual/year={int(year)}/data.parquet"
             _write_parquet(duck, FACT_COLUMNS, rows, new_dir / relative)
             partitions[str(int(year))] = {"rows": len(rows), "file": relative}
-        manifest["tables"]["qcew_annual"] = {
-            "rows": sum(p["rows"] for p in partitions.values()),
-            "partitions": partitions,
-        }
+            total_rows += len(rows)
+        manifest["tables"]["qcew_annual"] = {"rows": total_rows, "partitions": partitions}
         for name, (columns, _) in DIMENSIONS.items():
             relative = f"{name}.parquet"
             _write_parquet(duck, columns, dim_rows[name], new_dir / relative)
