@@ -3,6 +3,7 @@ name: QCEW pipeline
 # Three things happen here:
 #   1. Every push and pull request runs the automated tests.
 #   2. Once a month, a quick check asks BLS whether a newer annual file has been published.
+#      If it has, the workflow opens a GitHub issue (once) so the news doesn't sit in a log.
 #   3. If I click "Run workflow" by hand, it runs the real pipeline for one year and
 #      saves the log, validation results and database as a downloadable artifact.
 
@@ -33,12 +34,29 @@ jobs:
   check-for-new-data:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m qcew_pipeline.check_updates
+      - id: check
+        run: python -m qcew_pipeline.check_updates
+      - name: Open an issue if there is new data
+        if: steps.check.outputs.new_data == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          YEAR: ${{ steps.check.outputs.year }}
+        run: |
+          title="New QCEW annual file published: $YEAR"
+          existing=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq 'length')
+          if [ "$existing" = "0" ]; then
+            gh issue create --title "$title" --body "BLS has published the $YEAR annual QCEW file. To load it, add $YEAR to \`years\` in \`config.toml\` and run \`python -m qcew_pipeline.run --export\`. The usual checks run on it before anything is saved. This issue was opened automatically by the monthly check."
+          else
+            echo "An open issue for $YEAR already exists. Nothing to do."
+          fi
 
   run-pipeline:
     if: github.event_name == 'workflow_dispatch'

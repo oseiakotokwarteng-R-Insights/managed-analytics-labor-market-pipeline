@@ -17,13 +17,13 @@ The starting code does four things in order:
 3. **Validate** with 16 checks. A real error stops the run and nothing is saved.
 4. **Load** into SQLite. Running it twice does not create duplicates, and changed numbers are counted.
 
-It is tested (32 automated tests plus a script that breaks the data on purpose to see whether the checks notice) and runs the same way on Windows and Linux.
+It is tested (39 automated tests plus a script that breaks the data on purpose to see whether the checks notice) and runs the same way on Windows and Linux.
 
 ## What I am adding
 
 | Phase | What | Status |
 |---|---|---|
-| 1 | Harden it: catch rows BLS removes (done), alert when new data is published, handle bigger data, more tests, Docker, packaging | In progress |
+| 1 | Harden it: catch rows BLS removes (done), alert when new data is published (done), handle bigger data, more tests, Docker, packaging | In progress |
 | 2 | An analytics layer: Parquet files, then DuckDB and dbt models with tests | Planned |
 | 3 | Orchestration with Dagster, and email alerts | Planned |
 | 4 | More sources, including a check of one source against another, and a second region (California) set only by configuration | Planned |
