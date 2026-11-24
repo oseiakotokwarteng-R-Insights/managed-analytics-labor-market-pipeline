@@ -263,7 +263,7 @@ def _suppression_drift(df, max_jump_points):
     if len(years) < 2:
         return CheckResult(name, "warn", True, 0, "needs at least two years to compare")
     jumps = []
-    for prev, cur in zip(years, years[1:]):
+    for prev, cur in zip(years, years[1:], strict=False):
         rise = rate[cur] - rate[prev]
         if rise > max_jump_points:
             jumps.append(f"{int(cur)}: {rate[cur]:.1f}% hidden, up {rise:.1f} points from {int(prev)}")
@@ -283,7 +283,7 @@ def _source_volume_drift(scanned_by_year, max_change):
         return CheckResult(name, "warn", True, 0, "needs row counts for at least two years to compare")
     years = sorted(scanned_by_year)
     changes = []
-    for prev, cur in zip(years, years[1:]):
+    for prev, cur in zip(years, years[1:], strict=False):
         before, now = scanned_by_year[prev], scanned_by_year[cur]
         if before and abs(now - before) / before > max_change:
             share = abs(now - before) / before
