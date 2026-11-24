@@ -9,7 +9,7 @@ Every check returns a CheckResult. There are two levels that matter:
 Nothing here modifies the data; it only reports.
 """
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 
 import pandas as pd
 

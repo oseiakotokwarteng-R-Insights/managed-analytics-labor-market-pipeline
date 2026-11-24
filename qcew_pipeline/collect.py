@@ -11,7 +11,7 @@ import logging
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -58,7 +58,7 @@ def download_annual_file(year, cfg):
         "url": url,
         "local_path": str(dest),
         "local_name": dest.name,
-        "retrieved_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "retrieved_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "download_status": status,
         "size_bytes": dest.stat().st_size,
         "sha256": sha256_of_file(dest),

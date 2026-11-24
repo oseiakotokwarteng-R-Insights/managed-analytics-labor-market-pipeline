@@ -10,7 +10,7 @@ history I can see that instead of it happening silently.
 import hashlib
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .transform import MEASURES, area_type
@@ -19,7 +19,7 @@ SCHEMA_FILE = Path(__file__).resolve().parent / "schema.sql"
 
 
 def now_iso():
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def connect(db_path):

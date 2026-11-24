@@ -45,7 +45,7 @@ def run_pipeline(cfg, years=None, refs=None):
     expected problems like a failed download; those show up as status = 'failed').
     """
     years = list(years) if years else resolve_years(cfg)
-    timings = {}
+    timings: dict[str, float] = {}
     result = {"years": years, "status": "failed", "timings_seconds": timings}
     t_total = time.perf_counter()
 

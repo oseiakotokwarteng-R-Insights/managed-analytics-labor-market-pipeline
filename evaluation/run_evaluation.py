@@ -29,8 +29,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from qcew_pipeline import collect, load, transform, validate  # noqa: E402
 from qcew_pipeline.config import load_config  # noqa: E402
-from qcew_pipeline.years import resolve_years  # noqa: E402
 from qcew_pipeline.run import run_pipeline, setup_logging  # noqa: E402
+from qcew_pipeline.years import resolve_years  # noqa: E402
 
 
 def row_count(db_path):

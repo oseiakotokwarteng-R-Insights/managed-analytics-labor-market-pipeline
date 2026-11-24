@@ -1,6 +1,5 @@
 """Tests for the transform step: filtering and the suppression rule."""
 
-import io
 import zipfile
 
 import pandas as pd

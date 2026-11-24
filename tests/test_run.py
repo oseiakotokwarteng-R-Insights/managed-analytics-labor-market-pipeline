@@ -21,8 +21,9 @@ def pipeline(monkeypatch, cfg, refs, clean_df):
         monkeypatch.setattr(collect, "download_annual_file", lambda y, c: dict(
             year=y, url="http://example", local_path=str(y), local_name=f"{y}.zip", retrieved_at="now",
             download_status="test", size_bytes=1, sha256="abc"))
-        monkeypatch.setattr(transform, "read_year",
-                            lambda path, c: (frames[int(path)], {"rows_scanned": 99, "rows_kept": len(frames[int(path)])}))
+        monkeypatch.setattr(
+            transform, "read_year",
+            lambda path, c: (frames[int(path)], {"rows_scanned": 99, "rows_kept": len(frames[int(path)])}))
         monkeypatch.setattr(transform, "standardize", lambda raw: raw)
         return run.run_pipeline(cfg, years=sorted(frames))
     return go
