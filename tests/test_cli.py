@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from qcew_pipeline import export, run
+from qcew_pipeline import export, publish, run
 from qcew_pipeline.years import CheckError
 
 
@@ -70,3 +70,27 @@ def test_if_the_newest_year_cannot_be_worked_out_it_exits_two_without_running(cl
 
     assert run.main([]) == 2
     assert seen["years"] is None  # the pipeline never started
+
+
+def test_publish_only_happens_on_success_and_when_asked(cli, monkeypatch):
+    calls = []
+    monkeypatch.setattr(publish, "publish_lake", lambda config, out_dir=None: calls.append(config))
+
+    cli("success")
+    run.main([])
+    assert calls == []
+    run.main(["--publish"])
+    assert len(calls) == 1
+
+    cli("failed")
+    run.main(["--publish"])
+    assert len(calls) == 1
+
+
+def test_publishing_without_duckdb_installed_exits_two_with_a_helpful_message(cli, monkeypatch):
+    def missing(config, out_dir=None):
+        raise ModuleNotFoundError("No module named 'duckdb'", name="duckdb")
+    monkeypatch.setattr(publish, "publish_lake", missing)
+
+    cli("success")
+    assert run.main(["--publish"]) == 2

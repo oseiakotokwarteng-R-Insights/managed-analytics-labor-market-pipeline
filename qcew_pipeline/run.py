@@ -3,6 +3,7 @@
     python -m qcew_pipeline.run                 # all years in config.toml
     python -m qcew_pipeline.run --years 2023 2024
     python -m qcew_pipeline.run --export        # also write the CSV exports
+    python -m qcew_pipeline.run --publish       # also write Parquet files (needs the analytics extras)
 
 The order is: collect -> transform -> validate -> load. If validation finds a
 real error, nothing gets loaded and the run is marked as failed so the
@@ -183,6 +184,8 @@ def main(argv=None):
     parser.add_argument("--config", help="path to a config.toml (default: the one inside the package)")
     parser.add_argument("--years", nargs="+", type=int, help="override the years in the config")
     parser.add_argument("--export", action="store_true", help="write CSV exports after a successful run")
+    parser.add_argument("--publish", action="store_true",
+                        help="write the data as Parquet files after a successful run (needs the analytics extras)")
     args = parser.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -205,6 +208,15 @@ def main(argv=None):
         from .export import export_all
 
         export_all(cfg)
+
+    if result["status"] == "success" and args.publish:
+        from .publish import publish_lake
+
+        try:
+            publish_lake(cfg)
+        except ModuleNotFoundError as err:
+            log.error("%s isn't installed. Install it with: pip install -e \".[analytics]\"", err.name)
+            return 2
 
     return 0 if result["status"] == "success" else 1
 

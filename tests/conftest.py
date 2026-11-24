@@ -25,6 +25,7 @@ def cfg(tmp_path):
     cfg["paths"]["db_path"] = tmp_path / "test.sqlite"
     cfg["paths"]["raw_dir"] = tmp_path / "raw"
     cfg["paths"]["output_dir"] = tmp_path / "out"
+    cfg["paths"]["lake_dir"] = tmp_path / "lake"
     # The real files have thousands of rows; my fake data has a handful.
     cfg["validation"]["min_rows_per_year"] = 1
     cfg["validation"]["expected_county_counts"] = {"11": 1, "24": 2, "51": 1}

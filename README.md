@@ -28,11 +28,22 @@ One thing I noticed: the share of values BLS hides keeps going up. It was about 
 ## What I'm working on
 
 1. **Make it sturdier.** Done. It now notices rows BLS removes, loads faster, follows the newest year by itself, warns when the data suddenly changes shape, runs in Docker, and has style and type checks.
-2. **An analytics layer.** Parquet files, then DuckDB and dbt models with tests.
+2. **An analytics layer.** The Parquet files are done. Next are DuckDB and dbt models with tests.
 3. **Scheduling and alerts.** Dagster to run it on a schedule, and an email when something needs attention.
 4. **More sources.** A second source, checks between the two, and California added by changing a setting instead of the code.
 5. **A small dashboard** for people who don't want to write SQL.
 6. **A forecast** of employment, compared against simple baselines and tested on data it hasn't seen.
+
+## Parquet files
+
+The database is good for keeping track of what the pipeline did. For analysis I also publish the data as Parquet files, which analytics tools read much faster. This part needs DuckDB:
+
+```bash
+pip install -e ".[analytics]"
+qcew-run --publish
+```
+
+You get a `data/lake` folder with one folder per year, the code lists with their names, and a `manifest.json` that says what's inside. Hidden values stay empty, never zero, and every row carries the fingerprint of the file it came from. You can also run `qcew-publish` on its own to publish whatever is already in the database.
 
 ## Try it
 

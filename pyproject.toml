@@ -19,11 +19,13 @@ classifiers = [
 dependencies = ["pandas>=2.2"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11", "pandas-stubs"]
+analytics = ["duckdb>=1.1,<2"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11", "pandas-stubs", "qcew-pipeline[analytics]"]
 
 [project.scripts]
 qcew-run = "qcew_pipeline.run:main"
 qcew-check-updates = "qcew_pipeline.check_updates:main"
+qcew-publish = "qcew_pipeline.publish:main"
 
 [project.urls]
 Source = "https://github.com/oseiakotokwarteng-R-Insights/managed-analytics-labor-market-pipeline"
@@ -52,3 +54,7 @@ files = ["qcew_pipeline"]
 check_untyped_defs = true
 warn_unused_ignores = true
 warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+module = ["duckdb", "duckdb.*"]
+ignore_missing_imports = true

@@ -40,6 +40,18 @@ Lookup tables loaded directly from BLS's published code files.
 | `dim_ownership` | `own_code`, `own_title` |
 | `dim_agglevel` | `agglvl_code`, `agglvl_title` |
 
+## The Parquet files
+
+`qcew-run --publish` (or `qcew-publish`) writes the same data as Parquet files in the `lake_dir` folder, `data/lake` by default:
+
+| File | What it holds |
+|---|---|
+| `qcew_annual/year=YYYY/data.parquet` | The main table, one folder per year. Same columns as `qcew_annual`, except that the year is in the folder name instead of in the file, and `source_sha256` (the fingerprint of the BLS file the row came from) replaces `source_file_id`. |
+| `dim_area.parquet`, `dim_industry.parquet`, `dim_ownership.parquet`, `dim_agglevel.parquet` | The code lists with their names, the same as the database tables. |
+| `manifest.json` | When it was published, the row count for each table and year, and the `analytic_hash` of the database state it was written from. |
+
+Hidden values are empty in the files, not zero. Every publish replaces the whole folder, so it always matches the database exactly.
+
 ## `qcew_annual_removed`
 
 Rows that were once in `qcew_annual` but that BLS stopped publishing. They are moved here instead of being deleted, so nothing is lost. It has the same columns as `qcew_annual`, plus `removed_run_id` (the run that noticed) and `removed_at` (UTC time). There is no primary key, because a row can be removed, come back, and be removed again.

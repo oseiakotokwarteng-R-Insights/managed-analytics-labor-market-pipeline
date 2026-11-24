@@ -36,10 +36,12 @@ agglevel_titles = "https://data.bls.gov/cew/doc/titles/agglevel/agglevel_titles.
 
 [paths]
 # These are relative to the project folder. You can override them with the
-# environment variables QCEW_RAW_DIR, QCEW_DB_PATH and QCEW_OUTPUT_DIR.
+# environment variables QCEW_RAW_DIR, QCEW_DB_PATH, QCEW_OUTPUT_DIR and QCEW_LAKE_DIR.
 raw_dir = "data/raw"
 db_path = "data/qcew_dmv.sqlite"
 output_dir = "outputs"
+# Where the Parquet files go when the data is published (see publish.py).
+lake_dir = "data/lake"
 
 [download]
 # BLS asks automated users to identify themselves. If you want to put your own
