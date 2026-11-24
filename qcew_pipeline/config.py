@@ -23,7 +23,7 @@ def load_config(path=None):
         cfg = tomllib.load(f)
 
     paths = cfg["paths"]
-    paths.setdefault("lake_dir", "data/lake")      # settings files written before this existed still work
+    paths.setdefault("lake_dir", "data/lake")  # settings files written before this existed still work
     env_overrides = {
         "raw_dir": os.environ.get("QCEW_RAW_DIR"),
         "db_path": os.environ.get("QCEW_DB_PATH"),

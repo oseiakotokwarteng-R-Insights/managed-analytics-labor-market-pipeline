@@ -50,8 +50,8 @@ def test_the_files_hold_the_same_rows_as_the_database(cfg, loaded, clean_df):
 def test_hidden_values_stay_empty_and_are_never_turned_into_zeros(cfg, refs, clean_df, tmp_path):
     hidden = clean_df.index[(clean_df["area_fips"] == "24001") & (clean_df["agglvl_code"] == "71")][0]
     clean_df.loc[hidden, ["is_suppressed", "disclosure_code"]] = [1, "N"]
-    clean_df.loc[hidden, ["establishments", "employment", "total_wages", "avg_weekly_wage", "avg_annual_pay"]] = (
-        float("nan")
+    clean_df.loc[hidden, ["establishments", "employment", "total_wages", "avg_weekly_wage", "avg_annual_pay"]] = float(
+        "nan"
     )
     conn, run_id = fresh_db(cfg, refs)
     load.load_facts(conn, clean_df, run_id, fake_sources(conn, run_id), cfg)
@@ -68,13 +68,14 @@ def test_hidden_values_stay_empty_and_are_never_turned_into_zeros(cfg, refs, cle
 
 def test_each_row_knows_which_downloaded_file_it_came_from(cfg, loaded):
     publish.publish_lake(cfg, loaded)
-    assert query(loaded, f"SELECT DISTINCT source_sha256 FROM {FACTS}") == [("abc",)]     # fake_sources uses "abc"
+    assert query(loaded, f"SELECT DISTINCT source_sha256 FROM {FACTS}") == [("abc",)]  # fake_sources uses "abc"
 
 
 def test_the_code_lists_carry_the_names(cfg, loaded):
     publish.publish_lake(cfg, loaded)
-    rows = query(loaded, "SELECT area_title, area_type FROM read_parquet('LAKE/dim_area.parquet') "
-                         "WHERE area_fips = '24001'")
+    rows = query(
+        loaded, "SELECT area_title, area_type FROM read_parquet('LAKE/dim_area.parquet') WHERE area_fips = '24001'"
+    )
     assert rows == [("Allegany", "county")]
 
 
@@ -90,7 +91,7 @@ def test_the_manifest_matches_the_database(cfg, loaded, clean_df):
         assert manifest["analytic_hash"] == load.analytic_hash(conn)
     finally:
         conn.close()
-    assert str(cfg["paths"]["db_path"]) not in json.dumps(manifest)       # no folder names from this computer
+    assert str(cfg["paths"]["db_path"]) not in json.dumps(manifest)  # no folder names from this computer
 
 
 def test_publishing_twice_gives_the_same_data_and_leaves_nothing_behind(cfg, loaded):
@@ -101,7 +102,7 @@ def test_publishing_twice_gives_the_same_data_and_leaves_nothing_behind(cfg, loa
 
     assert query(loaded, f"SELECT * FROM {FACTS} ORDER BY year, area_fips, industry_code") == first
     leftovers = [p.name for p in loaded.parent.iterdir() if p.name.endswith((".new", ".old"))]
-    assert leftovers == []                                                        # no half-finished folders
+    assert leftovers == []  # no half-finished folders
 
 
 def test_an_interrupted_earlier_attempt_does_not_get_in_the_way(cfg, loaded):

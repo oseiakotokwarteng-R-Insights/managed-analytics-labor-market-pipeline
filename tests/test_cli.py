@@ -90,6 +90,7 @@ def test_publish_only_happens_on_success_and_when_asked(cli, monkeypatch):
 def test_publishing_without_duckdb_installed_exits_two_with_a_helpful_message(cli, monkeypatch):
     def missing(config, out_dir=None):
         raise ModuleNotFoundError("No module named 'duckdb'", name="duckdb")
+
     monkeypatch.setattr(publish, "publish_lake", missing)
 
     cli("success")

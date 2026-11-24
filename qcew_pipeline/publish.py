@@ -164,8 +164,10 @@ def main(argv=None):
     try:
         manifest = publish_lake(cfg, out)
     except ModuleNotFoundError as err:
-        print(f"{err.name} isn't installed. Install the analytics extras with: pip install -e \".[analytics]\"",
-              file=sys.stderr)
+        print(
+            f'{err.name} isn\'t installed. Install the analytics extras with: pip install -e ".[analytics]"',
+            file=sys.stderr,
+        )
         return 2
     except ValueError as err:
         print(err, file=sys.stderr)
