@@ -75,11 +75,16 @@ def build_analytics(cfg, project_dir=None, select=None):
     }
     args = [
         "build",
-        "--project-dir", str(project),
-        "--profiles-dir", str(project),
-        "--target-path", str(out / "target"),
-        "--log-path", str(out / "logs"),
-        "--vars", json.dumps(limits),
+        "--project-dir",
+        str(project),
+        "--profiles-dir",
+        str(project),
+        "--target-path",
+        str(out / "target"),
+        "--log-path",
+        str(out / "logs"),
+        "--vars",
+        json.dumps(limits),
     ]
     if select:
         args += ["--select", select]
@@ -87,7 +92,7 @@ def build_analytics(cfg, project_dir=None, select=None):
     environment = {
         "QCEW_LAKE_DIR": lake.as_posix(),
         "QCEW_ANALYTICS_DB": db.as_posix(),
-        "DBT_SEND_ANONYMOUS_USAGE_STATS": "False",     # don't send usage statistics anywhere
+        "DBT_SEND_ANONYMOUS_USAGE_STATS": "False",  # don't send usage statistics anywhere
     }
     with _environment(environment):
         result = dbtRunner().invoke(args)
@@ -108,8 +113,10 @@ def main(argv=None):
     try:
         passed = build_analytics(cfg, select=args.select)
     except ModuleNotFoundError as err:
-        print(f"{err.name} isn't installed. Install the analytics extras with: pip install -e \".[analytics]\"",
-              file=sys.stderr)
+        print(
+            f'{err.name} isn\'t installed. Install the analytics extras with: pip install -e ".[analytics]"',
+            file=sys.stderr,
+        )
         return 2
     except AnalyticsError as err:
         print(err, file=sys.stderr)

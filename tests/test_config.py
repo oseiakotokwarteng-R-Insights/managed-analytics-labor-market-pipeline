@@ -9,7 +9,14 @@ from qcew_pipeline.config import DEFAULT_CONFIG, load_config
 
 
 def test_the_default_settings_load_and_paths_become_absolute(monkeypatch):
-    for name in ("QCEW_RAW_DIR", "QCEW_DB_PATH", "QCEW_OUTPUT_DIR", "QCEW_LAKE_DIR", "QCEW_ANALYTICS_DB", "QCEW_USER_AGENT"):
+    for name in (
+        "QCEW_RAW_DIR",
+        "QCEW_DB_PATH",
+        "QCEW_OUTPUT_DIR",
+        "QCEW_LAKE_DIR",
+        "QCEW_ANALYTICS_DB",
+        "QCEW_USER_AGENT",
+    ):
         monkeypatch.delenv(name, raising=False)
     cfg = load_config()
     assert cfg["years"] == "auto" and cfg["window_years"] == 5
