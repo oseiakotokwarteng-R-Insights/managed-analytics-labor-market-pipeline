@@ -41,8 +41,10 @@ def test_every_check_compared_some_rows(built):
 
 def test_a_number_changed_in_the_database_after_publishing_is_caught(built, capsys):
     conn = load.connect(built["paths"]["db_path"])
-    conn.execute("UPDATE qcew_annual SET employment = employment + 1 WHERE area_fips = '24003' AND year = 2024 "
-                 "AND agglvl_code = '71'")
+    conn.execute(
+        "UPDATE qcew_annual SET employment = employment + 1 WHERE area_fips = '24003' AND year = 2024 "
+        "AND agglvl_code = '71'"
+    )
     conn.commit()
     conn.close()
 

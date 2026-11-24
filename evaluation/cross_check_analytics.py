@@ -129,36 +129,51 @@ def run_checks(cfg):
     try:
         county_db = pd.read_sql_query(
             "SELECT year, state_fips, area_fips, area_title, establishments, employment, avg_weekly_wage, "
-            "is_suppressed FROM v_county_totals", conn)
+            "is_suppressed FROM v_county_totals",
+            conn,
+        )
         sector_db = pd.read_sql_query(
             "SELECT year, state_fips, area_fips, area_title, industry_code, industry_title, employment, "
-            "avg_weekly_wage, is_suppressed FROM v_county_sectors", conn)
+            "avg_weekly_wage, is_suppressed FROM v_county_sectors",
+            conn,
+        )
         state_totals_db = pd.read_sql_query(
             "SELECT year, substr(area_fips, 1, 2) AS state_fips, employment AS bls_state_employment "
-            "FROM qcew_annual WHERE agglvl_code = '51' AND industry_code = '10'", conn)
+            "FROM qcew_annual WHERE agglvl_code = '51' AND industry_code = '10'",
+            conn,
+        )
         total_rows_db = conn.execute("SELECT COUNT(*) FROM qcew_annual").fetchone()[0]
 
         county_dbt = duck.execute(
             "SELECT year, state_fips, area_fips, area_title, establishments, employment, avg_weekly_wage, "
-            "is_suppressed::INTEGER AS is_suppressed FROM mart_county_year").df()
+            "is_suppressed::INTEGER AS is_suppressed FROM mart_county_year"
+        ).df()
         sector_dbt = duck.execute(
             "SELECT year, state_fips, area_fips, area_title, industry_code, industry_title, employment, "
-            "avg_weekly_wage, is_suppressed::INTEGER AS is_suppressed FROM mart_county_sector_year").df()
+            "avg_weekly_wage, is_suppressed::INTEGER AS is_suppressed FROM mart_county_sector_year"
+        ).df()
         state_dbt = duck.execute(
             "SELECT year, state_fips, bls_state_employment, county_sum_employment, county_count, gap_pct "
-            "FROM mart_state_year").df()
+            "FROM mart_state_year"
+        ).df()
         changes_dbt = duck.execute(
             "SELECT area_fips, year, employment_change, employment_change_pct, avg_weekly_wage_change_pct "
-            "FROM mart_county_year").df()
+            "FROM mart_county_year"
+        ).df()
         staging_rows = duck.execute("SELECT COUNT(*) FROM stg_qcew_annual").fetchone()[0]
 
-        sums = county_db.groupby(["state_fips", "year"]).agg(
-            county_sum_employment=("employment", lambda s: s.sum(min_count=1)),
-            county_count=("area_fips", "count"),
-        ).reset_index()
+        sums = (
+            county_db.groupby(["state_fips", "year"])
+            .agg(
+                county_sum_employment=("employment", lambda s: s.sum(min_count=1)),
+                county_count=("area_fips", "count"),
+            )
+            .reset_index()
+        )
         state_db = state_totals_db.merge(sums, on=["state_fips", "year"], how="left")
         state_db["gap_pct"] = (state_db["county_sum_employment"] - state_db["bls_state_employment"]) / state_db[
-            "bls_state_employment"].where(state_db["bls_state_employment"] > 0)
+            "bls_state_employment"
+        ].where(state_db["bls_state_employment"] > 0)
         state_db = state_db[STATE_COLUMNS]
 
         results = [
@@ -176,8 +191,12 @@ def run_checks(cfg):
 
 
 def report(results):
-    lines = ["# Cross-check: database, pandas and dbt", "",
-             "| Check | Rows compared | Differences | Result |", "|---|---|---|---|"]
+    lines = [
+        "# Cross-check: database, pandas and dbt",
+        "",
+        "| Check | Rows compared | Differences | Result |",
+        "|---|---|---|---|",
+    ]
     for r in results:
         result = "PASS" if r["passed"] else "FAIL"
         lines.append(f"| {r['check']} | {r['rows_compared']:,} | {r['problems']:,} | {result} |")
@@ -202,7 +221,7 @@ def main(argv=None):
     try:
         results = run_checks(cfg)
     except ModuleNotFoundError as err:
-        print(f"{err.name} isn't installed. Install the extras with: pip install -e \".[analytics]\"", file=sys.stderr)
+        print(f'{err.name} isn\'t installed. Install the extras with: pip install -e ".[analytics]"', file=sys.stderr)
         return 2
     except FileNotFoundError as err:
         print(err, file=sys.stderr)
