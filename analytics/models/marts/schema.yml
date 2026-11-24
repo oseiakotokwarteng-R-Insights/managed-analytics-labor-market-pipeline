@@ -5,7 +5,8 @@ models:
     description: One row per county and year. Private-sector jobs, businesses and pay, and the change from the year before.
     tests:
       - unique_combination:
-          columns: [area_fips, year]
+          arguments:
+            columns: [area_fips, year]
     columns:
       - name: area_fips
         tests: [not_null]
@@ -20,7 +21,8 @@ models:
     description: One row per county, sector and year, with the sector's share of the county's jobs.
     tests:
       - unique_combination:
-          columns: [area_fips, year, industry_code]
+          arguments:
+            columns: [area_fips, year, industry_code]
     columns:
       - name: industry_title
         tests: [not_null]
@@ -32,7 +34,8 @@ models:
     description: One row per state and year. The BLS state total next to the sum of its counties.
     tests:
       - unique_combination:
-          columns: [state_fips, year]
+          arguments:
+            columns: [state_fips, year]
     columns:
       - name: bls_state_employment
         tests: [not_null]

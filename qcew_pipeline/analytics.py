@@ -13,10 +13,11 @@ analytics extras (pip install -e ".[analytics]") and a publish first (qcew-run -
 """
 
 import argparse
+import importlib.util
 import json
 import os
+import subprocess
 import sys
-from contextlib import contextmanager
 from pathlib import Path
 
 from .config import load_config
@@ -42,19 +43,19 @@ def find_project():
     )
 
 
-@contextmanager
-def _environment(values):
-    """Set environment variables for the length of a block, then put them back."""
-    before = {key: os.environ.get(key) for key in values}
-    os.environ.update(values)
-    try:
-        yield
-    finally:
-        for key, old in before.items():
-            if old is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = old
+# dbt runs in its own process. dbt keeps its DuckDB connection open for as long as its process lives, so a
+# separate process means the database file is free again the moment the build ends, and nothing dbt does
+# can leak into this program.
+_DBT_RUNNER = """
+import sys
+from dbt.cli.main import dbtRunner
+
+result = dbtRunner().invoke(sys.argv[1:])
+if result.exception is not None:
+    print(f"dbt could not run: {result.exception}", file=sys.stderr)
+    sys.exit(2)
+sys.exit(0 if result.success else 1)
+"""
 
 
 def build_analytics(cfg, project_dir=None, select=None):
@@ -62,9 +63,9 @@ def build_analytics(cfg, project_dir=None, select=None):
     lake = Path(cfg["paths"]["lake_dir"])
     if not (lake / "manifest.json").is_file():
         raise AnalyticsError(f"No published files found in {lake}. Publish first with: qcew-run --publish")
+    if importlib.util.find_spec("dbt") is None:
+        raise ModuleNotFoundError("No module named 'dbt'", name="dbt")
     project = Path(project_dir) if project_dir else find_project()
-
-    from dbt.cli.main import dbtRunner  # imported here so the rest of the pipeline works without dbt
 
     out = Path(cfg["paths"]["output_dir"]) / "dbt"
     db = Path(cfg["paths"]["analytics_db"])
@@ -75,30 +76,25 @@ def build_analytics(cfg, project_dir=None, select=None):
     }
     args = [
         "build",
-        "--project-dir",
-        str(project),
-        "--profiles-dir",
-        str(project),
-        "--target-path",
-        str(out / "target"),
-        "--log-path",
-        str(out / "logs"),
-        "--vars",
-        json.dumps(limits),
-    ]
+        "--project-dir", str(project),
+        "--profiles-dir", str(project),
+        "--target-path", str(out / "target"),
+        "--log-path", str(out / "logs"),
+        "--vars", json.dumps(limits),
+    ]  # fmt: skip
     if select:
         args += ["--select", select]
 
     environment = {
+        **os.environ,
         "QCEW_LAKE_DIR": lake.as_posix(),
         "QCEW_ANALYTICS_DB": db.as_posix(),
-        "DBT_SEND_ANONYMOUS_USAGE_STATS": "False",  # don't send usage statistics anywhere
+        "DBT_SEND_ANONYMOUS_USAGE_STATS": "False",     # don't send usage statistics anywhere
     }
-    with _environment(environment):
-        result = dbtRunner().invoke(args)
-    if result.exception is not None:
-        raise AnalyticsError(f"dbt could not run: {result.exception}")
-    return bool(result.success)
+    done = subprocess.run([sys.executable, "-c", _DBT_RUNNER, *args], env=environment, check=False)
+    if done.returncode == 2:
+        raise AnalyticsError("dbt could not run. The message above says why.")
+    return done.returncode == 0
 
 
 def main(argv=None):

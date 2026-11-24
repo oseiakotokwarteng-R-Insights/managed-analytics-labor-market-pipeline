@@ -128,9 +128,19 @@ def test_the_dbt_project_is_found_from_the_repository_folder(monkeypatch):
     assert (analytics.find_project() / "dbt_project.yml").is_file()
 
 
-def test_the_environment_is_put_back_after_a_build(cfg, refs, clean_df, monkeypatch):
+def test_building_never_changes_this_programs_own_environment(cfg, refs, clean_df, monkeypatch):
     monkeypatch.delenv("QCEW_LAKE_DIR", raising=False)
+    monkeypatch.delenv("QCEW_ANALYTICS_DB", raising=False)
     publish_fake_data(cfg, refs, clean_df)
+
     build(cfg, select="stg_area")
 
     assert "QCEW_LAKE_DIR" not in os.environ and "QCEW_ANALYTICS_DB" not in os.environ
+
+
+def test_a_failed_build_leaves_the_database_file_free_to_open(cfg, refs, clean_df):
+    # dbt runs in its own process, so its connection is closed the moment it finishes.
+    publish_fake_data(cfg, refs, clean_df)
+    assert build(cfg) is True
+    assert rows(cfg, "select count(*) from stg_area")[0][0] > 0
+    assert build(cfg, select="mart_county_year") is True        # and it can be built into again

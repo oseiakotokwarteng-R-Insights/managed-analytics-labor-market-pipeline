@@ -5,7 +5,8 @@ models:
     description: The main table from the Parquet files. One row per area, year, ownership type and industry.
     tests:
       - unique_combination:
-          columns: [area_fips, year, own_code, industry_code]
+          arguments:
+            columns: [area_fips, year, own_code, industry_code]
     columns:
       - name: area_fips
         tests:
