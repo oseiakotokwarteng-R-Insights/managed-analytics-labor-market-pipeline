@@ -38,7 +38,7 @@ jobs:
           status=0
           ruff format --check . > format.txt 2>&1 || status=$?
           cat format.txt
-          sed -n 's/^Would reformat: \(.*\)$/::error file=::Not formatted the way ruff format writes it/p' format.txt
+          sed -n 's/^Would reformat: \(.*\)$/::error file=\1::Not formatted the way ruff format writes it/p' format.txt
           exit $status
 
   typecheck:
@@ -57,7 +57,7 @@ jobs:
           status=0
           mypy --no-color-output --no-error-summary > mypy.txt 2>&1 || status=$?
           cat mypy.txt
-          sed -n -E 's#^([^:]+):([0-9]+): error: (.*)$#::error file=,line=::#p' mypy.txt
+          sed -n -E 's#^([^:]+):([0-9]+): error: (.*)$#::error file=\1,line=\2::\3#p' mypy.txt
           exit $status
 
   test:
