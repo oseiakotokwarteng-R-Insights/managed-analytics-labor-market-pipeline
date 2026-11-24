@@ -1,0 +1,16 @@
+# The raw BLS downloads are big (about 75 MB per year) and can be re-downloaded,
+# so they stay out of the repository. The manifest in the database records their hashes.
+data/raw/
+data/raw_eval/
+*.zip
+*.part
+
+# Python clutter
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Local environment files
+.venv/
+.env

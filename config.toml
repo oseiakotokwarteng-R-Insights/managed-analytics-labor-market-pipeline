@@ -1,0 +1,62 @@
+# Settings for the QCEW pipeline.
+# If I want to change what the pipeline pulls (years, states, industries),
+# this is the file to edit. The code itself shouldn't need to change.
+
+# Which annual files to pull. QCEW annual files come out about a year after the data year.
+years = [2020, 2021, 2022, 2023, 2024]
+
+# State FIPS codes: 11 = District of Columbia, 24 = Maryland, 51 = Virginia
+state_fips = ["11", "24", "51"]
+
+# Ownership 5 = private sector. I'm sticking with private because government coverage
+# and pay rules are different enough that mixing them would make comparisons confusing.
+ownership_codes = ["5"]
+
+# Aggregation levels (BLS code for "what kind of row is this"):
+#   51 = state total (used only as a cross-check against the county rows)
+#   71 = county total
+#   74 = county, broad NAICS sector (two-digit industries like Construction, Health Care)
+agglvl_codes = ["51", "71", "74"]
+
+# size_code 0 means "all establishment sizes", which is what I want.
+size_code = "0"
+
+[urls]
+annual_file = "https://data.bls.gov/cew/data/files/{year}/csv/{year}_annual_singlefile.zip"
+area_titles = "https://data.bls.gov/cew/doc/titles/area/area_titles.csv"
+industry_titles = "https://data.bls.gov/cew/doc/titles/industry/industry_titles.csv"
+ownership_titles = "https://data.bls.gov/cew/doc/titles/ownership/ownership_titles.csv"
+agglevel_titles = "https://data.bls.gov/cew/doc/titles/agglevel/agglevel_titles.csv"
+
+[paths]
+# These are relative to the project folder. You can override them with the
+# environment variables QCEW_RAW_DIR, QCEW_DB_PATH and QCEW_OUTPUT_DIR.
+raw_dir = "data/raw"
+db_path = "data/qcew_dmv.sqlite"
+output_dir = "outputs"
+
+[download]
+# BLS asks automated users to identify themselves. If you want to put your own
+# contact info in here, set the QCEW_USER_AGENT environment variable instead of
+# editing this file, so it never ends up in the repository.
+user_agent = "qcew-dmv-pipeline/0.1 (student capstone project)"
+retries = 3
+timeout_seconds = 180
+# If the zip is already on disk, reuse it instead of downloading it again.
+reuse_existing_files = true
+
+[validation]
+# A year with fewer filtered rows than this probably means something went wrong.
+min_rows_per_year = 3000
+# How far the sum of county totals can be from the published state total (2%).
+state_reconciliation_tolerance = 0.02
+# How far the sum of sector employment can exceed the county total (1%).
+sector_sum_tolerance = 0.01
+# avg_annual_pay should be about 52 x avg_weekly_wage. Allow some rounding room.
+wage_check_tolerance_dollars = 60
+
+[validation.expected_county_counts]
+# Counties and county-equivalents (independent cities count in Virginia).
+"11" = 1
+"24" = 24
+"51" = 133

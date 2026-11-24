@@ -1,0 +1,65 @@
+name: QCEW pipeline
+
+# Three things happen here:
+#   1. Every push and pull request runs the automated tests.
+#   2. Once a month, a quick check asks BLS whether a newer annual file has been published.
+#   3. If I click "Run workflow" by hand, it runs the real pipeline for one year and
+#      saves the log, validation results and database as a downloadable artifact.
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 14 1 * *"      # 14:00 UTC on the first of each month
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Year to run through the pipeline"
+        default: "2024"
+
+jobs:
+  test:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+
+  check-for-new-data:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m qcew_pipeline.check_updates
+
+  run-pipeline:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run the pipeline for one year
+        run: python -m qcew_pipeline.run --years ${{ github.event.inputs.year }} --export
+        env:
+          QCEW_DB_PATH: ${{ runner.temp }}/qcew_ci.sqlite
+          QCEW_RAW_DIR: ${{ runner.temp }}/raw
+          QCEW_OUTPUT_DIR: ${{ runner.temp }}/out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pipeline-run-${{ github.event.inputs.year }}
+          path: |
+            ${{ runner.temp }}/out
+            ${{ runner.temp }}/qcew_ci.sqlite
