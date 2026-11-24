@@ -1,0 +1,12 @@
+# Where dbt builds its tables. Both locations can be changed with environment variables; the
+# qcew-build command sets them from config.toml. The defaults are for running dbt by hand from
+# inside the analytics folder.
+qcew_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('QCEW_ANALYTICS_DB', '../data/analytics.duckdb') }}"
+      threads: 1
+      settings:
+        TimeZone: UTC

@@ -26,6 +26,7 @@ def cfg(tmp_path):
     cfg["paths"]["raw_dir"] = tmp_path / "raw"
     cfg["paths"]["output_dir"] = tmp_path / "out"
     cfg["paths"]["lake_dir"] = tmp_path / "lake"
+    cfg["paths"]["analytics_db"] = tmp_path / "analytics.duckdb"
     # The real files have thousands of rows; my fake data has a handful.
     cfg["validation"]["min_rows_per_year"] = 1
     cfg["validation"]["expected_county_counts"] = {"11": 1, "24": 2, "51": 1}

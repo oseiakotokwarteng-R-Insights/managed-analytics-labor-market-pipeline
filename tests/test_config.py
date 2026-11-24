@@ -9,11 +9,12 @@ from qcew_pipeline.config import DEFAULT_CONFIG, load_config
 
 
 def test_the_default_settings_load_and_paths_become_absolute(monkeypatch):
-    for name in ("QCEW_RAW_DIR", "QCEW_DB_PATH", "QCEW_OUTPUT_DIR", "QCEW_LAKE_DIR", "QCEW_USER_AGENT"):
+    for name in ("QCEW_RAW_DIR", "QCEW_DB_PATH", "QCEW_OUTPUT_DIR", "QCEW_LAKE_DIR", "QCEW_ANALYTICS_DB", "QCEW_USER_AGENT"):
         monkeypatch.delenv(name, raising=False)
     cfg = load_config()
     assert cfg["years"] == "auto" and cfg["window_years"] == 5
     assert cfg["paths"]["lake_dir"] == Path.cwd() / "data" / "lake"
+    assert cfg["paths"]["analytics_db"] == Path.cwd() / "data" / "analytics.duckdb"
     assert cfg["paths"]["db_path"] == Path.cwd() / "data" / "qcew_dmv.sqlite"  # relative to where it is run
     assert all(Path(p).is_absolute() for p in cfg["paths"].values())
 
@@ -23,6 +24,7 @@ def test_environment_variables_win_over_the_file(monkeypatch, tmp_path):
     monkeypatch.setenv("QCEW_DB_PATH", str(tmp_path / "db.sqlite"))
     monkeypatch.setenv("QCEW_OUTPUT_DIR", str(tmp_path / "out"))
     monkeypatch.setenv("QCEW_LAKE_DIR", str(tmp_path / "lake"))
+    monkeypatch.setenv("QCEW_ANALYTICS_DB", str(tmp_path / "a.duckdb"))
     monkeypatch.setenv("QCEW_USER_AGENT", "someone-else/1.0 (me@example.org)")
 
     cfg = load_config()
@@ -31,6 +33,7 @@ def test_environment_variables_win_over_the_file(monkeypatch, tmp_path):
     assert cfg["paths"]["db_path"] == tmp_path / "db.sqlite"
     assert cfg["paths"]["output_dir"] == tmp_path / "out"
     assert cfg["paths"]["lake_dir"] == tmp_path / "lake"
+    assert cfg["paths"]["analytics_db"] == tmp_path / "a.duckdb"
     assert cfg["download"]["user_agent"] == "someone-else/1.0 (me@example.org)"
 
 

@@ -1,0 +1,68 @@
+version: 2
+
+models:
+  - name: stg_qcew_annual
+    description: The main table from the Parquet files. One row per area, year, ownership type and industry.
+    tests:
+      - unique_combination:
+          columns: [area_fips, year, own_code, industry_code]
+    columns:
+      - name: area_fips
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_area'), field: area_fips}
+      - name: year
+        tests: [not_null]
+      - name: own_code
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_ownership'), field: own_code}
+      - name: industry_code
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_industry'), field: industry_code}
+      - name: agglvl_code
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_agglevel'), field: agglvl_code}
+      - name: is_suppressed
+        description: True when BLS hid the numbers to protect a business. The numbers are NULL then, never zero.
+        tests: [not_null]
+      - name: establishments
+        tests: [non_negative]
+      - name: employment
+        tests: [non_negative]
+      - name: total_wages
+        tests: [non_negative]
+      - name: avg_weekly_wage
+        tests: [non_negative]
+      - name: avg_annual_pay
+        tests: [non_negative]
+
+  - name: stg_area
+    description: Every area BLS uses, with the state name added from the state_fips seed.
+    columns:
+      - name: area_fips
+        tests: [unique, not_null]
+      - name: state_name
+        description: Empty only if the state code is not in the state_fips seed.
+        tests: [not_null]
+      - name: area_type
+        tests:
+          - accepted_values:
+              values: ['state', 'county', 'undefined']
+
+  - name: stg_industry
+    columns:
+      - name: industry_code
+        tests: [unique, not_null]
+
+  - name: stg_ownership
+    columns:
+      - name: own_code
+        tests: [unique, not_null]
+
+  - name: stg_agglevel
+    columns:
+      - name: agglvl_code
+        tests: [unique, not_null]

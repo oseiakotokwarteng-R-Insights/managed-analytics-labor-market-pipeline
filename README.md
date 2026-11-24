@@ -28,7 +28,7 @@ One thing I noticed: the share of values BLS hides keeps going up. It was about 
 ## What I'm working on
 
 1. **Make it sturdier.** Done. It now notices rows BLS removes, loads faster, follows the newest year by itself, warns when the data suddenly changes shape, runs in Docker, and has style and type checks.
-2. **An analytics layer.** The Parquet files are done. Next are DuckDB and dbt models with tests.
+2. **An analytics layer.** The Parquet files and the dbt project with its tests are written. Still to do: check on the real data that the dbt numbers match what the database says.
 3. **Scheduling and alerts.** Dagster to run it on a schedule, and an email when something needs attention.
 4. **More sources.** A second source, checks between the two, and California added by changing a setting instead of the code.
 5. **A small dashboard** for people who don't want to write SQL.
@@ -44,6 +44,16 @@ qcew-run --publish
 ```
 
 You get a `data/lake` folder with one folder per year, the code lists with their names, and a `manifest.json` that says what's inside. Hidden values stay empty, never zero, and every row carries the fingerprint of the file it came from. You can also run `qcew-publish` on its own to publish whatever is already in the database.
+
+## The analytics layer
+
+On top of the Parquet files there's a small dbt project in the `analytics` folder. DuckDB reads the files, and dbt does two things with them. It cleans them into staging tables and builds three summary tables: jobs and pay by county and year (with the change from the year before), by county and sector (with each sector's share of the county's jobs), and by state (the BLS total next to the sum of its counties). Then it runs tests on all of it.
+
+```bash
+qcew-build
+```
+
+The tests include the ones I care most about. A hidden value must never be a zero. No two rows can share the same key. Every code must exist in BLS's own list. The counties must add up to the state total, and the sectors must never add up to more than the county. If one fails, the build fails. The limits come from `config.toml`, the same ones the pipeline uses.
 
 ## Try it
 

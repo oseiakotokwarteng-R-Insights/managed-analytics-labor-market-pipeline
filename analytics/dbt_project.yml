@@ -1,0 +1,28 @@
+name: qcew_analytics
+version: "0.1.0"
+profile: qcew_analytics
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+
+# These two limits are the same ones the pipeline uses (config.toml). The qcew-build command passes the
+# values from config.toml in, so they only live in one place. The numbers here are the defaults for running
+# dbt by hand.
+vars:
+  state_gap_tolerance: 0.02
+  sector_sum_tolerance: 0.01
+
+models:
+  qcew_analytics:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
+
+seeds:
+  qcew_analytics:
+    state_fips:
+      +column_types:
+        state_fips: varchar

@@ -21,3 +21,13 @@ build/
 dist/
 .mypy_cache/
 .ruff_cache/
+
+# Published and built data (made by qcew-publish and qcew-build; rebuilt from the database)
+data/lake/
+data/lake.new/
+data/lake.old/
+*.duckdb
+analytics/target/
+analytics/logs/
+analytics/.user.yml
+outputs/dbt/
