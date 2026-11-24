@@ -21,7 +21,7 @@ from qcew_pipeline.transform import OUTPUT_COLUMNS  # noqa: E402
 @pytest.fixture
 def cfg(tmp_path):
     cfg = load_config()
-    cfg["years"] = [2023, 2024]            # a fixed list, so the tests never ask BLS which year is newest
+    cfg["years"] = [2023, 2024]  # a fixed list, so the tests never ask BLS which year is newest
     cfg["paths"]["db_path"] = tmp_path / "test.sqlite"
     cfg["paths"]["raw_dir"] = tmp_path / "raw"
     cfg["paths"]["output_dir"] = tmp_path / "out"
@@ -34,22 +34,38 @@ def cfg(tmp_path):
 @pytest.fixture
 def refs():
     return {
-        "area": pd.DataFrame({
-            "area_fips": ["11000", "11001", "24000", "24001", "24003", "51000", "51013"],
-            "area_title": ["DC", "District of Columbia", "Maryland", "Allegany", "Anne Arundel",
-                           "Virginia", "Arlington"]}),
-        "industry": pd.DataFrame({"industry_code": ["10", "23", "62"],
-                                  "industry_title": ["Total", "Construction", "Health care"]}),
+        "area": pd.DataFrame(
+            {
+                "area_fips": ["11000", "11001", "24000", "24001", "24003", "51000", "51013"],
+                "area_title": [
+                    "DC",
+                    "District of Columbia",
+                    "Maryland",
+                    "Allegany",
+                    "Anne Arundel",
+                    "Virginia",
+                    "Arlington",
+                ],
+            }
+        ),
+        "industry": pd.DataFrame(
+            {"industry_code": ["10", "23", "62"], "industry_title": ["Total", "Construction", "Health care"]}
+        ),
         "ownership": pd.DataFrame({"own_code": ["0", "5"], "own_title": ["Total", "Private"]}),
-        "agglevel": pd.DataFrame({"agglvl_code": ["51", "71", "74"],
-                                  "agglvl_title": ["State total", "County total", "County sector"]}),
+        "agglevel": pd.DataFrame(
+            {"agglvl_code": ["51", "71", "74"], "agglvl_title": ["State total", "County total", "County sector"]}
+        ),
     }
 
 
 def make_row(area, year, agglvl, industry, employment, wage=1000, suppressed=0):
     return {
-        "area_fips": area, "year": year, "own_code": "5", "industry_code": industry,
-        "agglvl_code": agglvl, "disclosure_code": "N" if suppressed else None,
+        "area_fips": area,
+        "year": year,
+        "own_code": "5",
+        "industry_code": industry,
+        "agglvl_code": agglvl,
+        "disclosure_code": "N" if suppressed else None,
         "is_suppressed": suppressed,
         "establishments": None if suppressed else 10.0,
         "employment": None if suppressed else float(employment),
@@ -65,14 +81,25 @@ def clean_df():
     rows = []
     for year in (2023, 2024):
         # DC: one county, which is also the whole state
-        rows += [make_row("11000", year, "51", "10", 100), make_row("11001", year, "71", "10", 100),
-                 make_row("11001", year, "74", "23", 40), make_row("11001", year, "74", "62", 60)]
+        rows += [
+            make_row("11000", year, "51", "10", 100),
+            make_row("11001", year, "71", "10", 100),
+            make_row("11001", year, "74", "23", 40),
+            make_row("11001", year, "74", "62", 60),
+        ]
         # Maryland: two counties
-        rows += [make_row("24000", year, "51", "10", 300), make_row("24001", year, "71", "10", 100),
-                 make_row("24003", year, "71", "10", 200),
-                 make_row("24001", year, "74", "23", 100), make_row("24003", year, "74", "62", 150),
-                 make_row("24003", year, "74", "23", 50)]
+        rows += [
+            make_row("24000", year, "51", "10", 300),
+            make_row("24001", year, "71", "10", 100),
+            make_row("24003", year, "71", "10", 200),
+            make_row("24001", year, "74", "23", 100),
+            make_row("24003", year, "74", "62", 150),
+            make_row("24003", year, "74", "23", 50),
+        ]
         # Virginia: one county
-        rows += [make_row("51000", year, "51", "10", 50), make_row("51013", year, "71", "10", 50),
-                 make_row("51013", year, "74", "23", 50)]
+        rows += [
+            make_row("51000", year, "51", "10", 50),
+            make_row("51013", year, "71", "10", 50),
+            make_row("51013", year, "74", "23", 50),
+        ]
     return pd.DataFrame(rows)[OUTPUT_COLUMNS]

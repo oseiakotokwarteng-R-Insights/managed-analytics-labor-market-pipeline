@@ -11,10 +11,21 @@ COLUMNS = transform.REQUIRED_RAW_COLUMNS
 
 
 def raw_row(area, own="5", agglvl="71", size="0", industry="10", disclosure="", employment="100"):
-    return {"area_fips": area, "own_code": own, "industry_code": industry, "agglvl_code": agglvl,
-            "size_code": size, "year": "2024", "qtr": "A", "disclosure_code": disclosure,
-            "annual_avg_estabs": "10", "annual_avg_emplvl": employment, "total_annual_wages": "5000",
-            "annual_avg_wkly_wage": "1000", "avg_annual_pay": "52000"}
+    return {
+        "area_fips": area,
+        "own_code": own,
+        "industry_code": industry,
+        "agglvl_code": agglvl,
+        "size_code": size,
+        "year": "2024",
+        "qtr": "A",
+        "disclosure_code": disclosure,
+        "annual_avg_estabs": "10",
+        "annual_avg_emplvl": employment,
+        "total_annual_wages": "5000",
+        "annual_avg_wkly_wage": "1000",
+        "avg_annual_pay": "52000",
+    }
 
 
 def make_zip(tmp_path, rows, extra_columns=(), name="2024.zip", csv_names=("2024.annual.singlefile.csv",)):
@@ -30,14 +41,14 @@ def make_zip(tmp_path, rows, extra_columns=(), name="2024.zip", csv_names=("2024
 
 def test_only_the_rows_the_config_asks_for_are_kept(cfg, tmp_path):
     rows = [
-        raw_row("11001"),                                  # DC county total, private: keep
-        raw_row("24000", agglvl="51"),                     # Maryland state total: keep
-        raw_row("51013", agglvl="74", industry="23"),      # Arlington sector row: keep
-        raw_row("11001", own="0"),                         # all ownerships, not private: drop
-        raw_row("11001", size="1"),                        # one size class, not "all sizes": drop
-        raw_row("48201"),                                  # Texas: drop
-        raw_row("C1234"),                                  # a metro area code, not 5 digits: drop
-        raw_row("11001", agglvl="78"),                     # a level the config doesn't list: drop
+        raw_row("11001"),  # DC county total, private: keep
+        raw_row("24000", agglvl="51"),  # Maryland state total: keep
+        raw_row("51013", agglvl="74", industry="23"),  # Arlington sector row: keep
+        raw_row("11001", own="0"),  # all ownerships, not private: drop
+        raw_row("11001", size="1"),  # one size class, not "all sizes": drop
+        raw_row("48201"),  # Texas: drop
+        raw_row("C1234"),  # a metro area code, not 5 digits: drop
+        raw_row("11001", agglvl="78"),  # a level the config doesn't list: drop
     ]
     zip_path = make_zip(tmp_path, rows)
 

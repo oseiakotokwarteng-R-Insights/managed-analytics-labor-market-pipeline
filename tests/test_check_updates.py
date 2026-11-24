@@ -17,8 +17,12 @@ def test_in_auto_mode_it_reports_the_newest_year_and_the_window(cfg, monkeypatch
 
     result = check_updates.check(cfg)
 
-    assert result == {"mode": "auto", "latest_published": 2025,
-                      "window": [2021, 2022, 2023, 2024, 2025], "new_data": True}
+    assert result == {
+        "mode": "auto",
+        "latest_published": 2025,
+        "window": [2021, 2022, 2023, 2024, 2025],
+        "new_data": True,
+    }
     assert "2021-2025" in check_updates.describe(result)
 
 
@@ -66,6 +70,7 @@ def test_main_writes_nothing_when_not_running_in_github_actions(cfg, monkeypatch
 def test_a_check_that_cannot_reach_bls_fails_loudly(cfg, monkeypatch, capsys):
     def no_network(*args, **kwargs):
         raise urllib.error.URLError("no connection")
+
     monkeypatch.setattr(check_updates, "load_config", lambda: cfg)
     monkeypatch.setattr(years.urllib.request, "urlopen", no_network)
 
@@ -77,6 +82,7 @@ def test_a_404_means_not_published_but_other_http_errors_are_failures(cfg, monke
     def answer(code):
         def fake(*args, **kwargs):
             raise urllib.error.HTTPError("http://x", code, "msg", {}, None)
+
         return fake
 
     monkeypatch.setattr(years.urllib.request, "urlopen", answer(404))

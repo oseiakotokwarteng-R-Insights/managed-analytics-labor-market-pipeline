@@ -24,7 +24,7 @@ class FakeResponse:
         if self.fail_after is not None and self.sent >= self.fail_after:
             raise ConnectionError("connection dropped")
         step = 4 if self.fail_after is not None else size
-        chunk = self.data[self.sent:self.sent + step]
+        chunk = self.data[self.sent : self.sent + step]
         self.sent += len(chunk)
         return chunk
 
@@ -50,6 +50,7 @@ def serve(monkeypatch, *responses):
         if isinstance(item, Exception):
             raise item
         return item
+
     monkeypatch.setattr(collect, "_open", fake_open)
     return calls
 
@@ -69,13 +70,13 @@ def test_a_download_is_saved_fingerprinted_and_described(cfg, monkeypatch):
     assert info["url"].endswith("2024_annual_singlefile.zip") and calls == [info["url"]]
     assert info["size_bytes"] == 700
     assert info["sha256"] == hashlib.sha256(b"zipdata" * 100).hexdigest()
-    assert not list(cfg["paths"]["raw_dir"].glob("*.part"))          # the temporary file was renamed
+    assert not list(cfg["paths"]["raw_dir"].glob("*.part"))  # the temporary file was renamed
 
 
 def test_a_file_already_on_disk_is_reused_not_downloaded_again(cfg, monkeypatch):
     cfg["paths"]["raw_dir"].mkdir(parents=True)
     (cfg["paths"]["raw_dir"] / "2024_annual_singlefile.zip").write_bytes(b"already here")
-    calls = serve(monkeypatch)                                         # any download would fail the test
+    calls = serve(monkeypatch)  # any download would fail the test
 
     info = collect.download_annual_file(2024, cfg)
 
@@ -138,7 +139,7 @@ def test_reference_tables_keep_codes_as_text_including_leading_zeros(cfg, monkey
 
     df = collect.fetch_reference_table("industry_titles", cfg)
 
-    assert list(df.columns) == ["code", "title"]                       # the byte-order mark was removed
+    assert list(df.columns) == ["code", "title"]  # the byte-order mark was removed
     assert df["code"].tolist() == ["01", "31-33"]
 
 

@@ -17,9 +17,19 @@ log = logging.getLogger("qcew")
 
 # The columns I actually need from the BLS file.
 REQUIRED_RAW_COLUMNS = [
-    "area_fips", "own_code", "industry_code", "agglvl_code", "size_code",
-    "year", "qtr", "disclosure_code", "annual_avg_estabs", "annual_avg_emplvl",
-    "total_annual_wages", "annual_avg_wkly_wage", "avg_annual_pay",
+    "area_fips",
+    "own_code",
+    "industry_code",
+    "agglvl_code",
+    "size_code",
+    "year",
+    "qtr",
+    "disclosure_code",
+    "annual_avg_estabs",
+    "annual_avg_emplvl",
+    "total_annual_wages",
+    "annual_avg_wkly_wage",
+    "avg_annual_pay",
 ]
 
 # BLS name -> the plainer name I use in my database.
@@ -35,8 +45,13 @@ MEASURES = ["establishments", "employment", "total_wages", "avg_weekly_wage", "a
 
 # This is the order the final table's columns come out in.
 OUTPUT_COLUMNS = [
-    "area_fips", "year", "own_code", "industry_code", "agglvl_code",
-    "disclosure_code", "is_suppressed",
+    "area_fips",
+    "year",
+    "own_code",
+    "industry_code",
+    "agglvl_code",
+    "disclosure_code",
+    "is_suppressed",
 ] + MEASURES
 
 

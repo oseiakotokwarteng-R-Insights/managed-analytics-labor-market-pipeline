@@ -11,6 +11,7 @@ from qcew_pipeline.years import CheckError
 @pytest.fixture
 def cli(monkeypatch, cfg):
     """Replace the real pipeline with a stub, and record what the command line asked of it."""
+
     def make(status):
         seen = {"years": None, "exported": False}
 
@@ -22,13 +23,14 @@ def cli(monkeypatch, cfg):
         monkeypatch.setattr(run, "run_pipeline", fake_run)
         monkeypatch.setattr(export, "export_all", lambda c: seen.__setitem__("exported", True))
         return seen
+
     return make
 
 
 def test_a_successful_run_exits_zero_and_writes_a_summary(cli, cfg):
     seen = cli("success")
     assert run.main([]) == 0
-    assert seen["years"] == [2023, 2024]                                  # the fixed list from the config
+    assert seen["years"] == [2023, 2024]  # the fixed list from the config
     summaries = list(cfg["paths"]["output_dir"].glob("run_summary_*.json"))
     assert len(summaries) == 1 and json.loads(summaries[0].read_text())["status"] == "success"
 
@@ -63,7 +65,8 @@ def test_if_the_newest_year_cannot_be_worked_out_it_exits_two_without_running(cl
 
     def unreachable(config):
         raise CheckError("BLS unreachable")
+
     monkeypatch.setattr(run, "resolve_years", unreachable)
 
     assert run.main([]) == 2
-    assert seen["years"] is None                                          # the pipeline never started
+    assert seen["years"] is None  # the pipeline never started

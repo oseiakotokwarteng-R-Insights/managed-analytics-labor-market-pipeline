@@ -86,19 +86,23 @@ def run_pipeline(cfg, years=None, refs=None):
         source_ids = {}
         for info in files:
             s = stats_by_year[info["year"]]
-            source_ids[info["year"]] = load.record_source_file(
-                conn, run_id, info, s["rows_scanned"], s["rows_kept"])
+            source_ids[info["year"]] = load.record_source_file(conn, run_id, info, s["rows_scanned"], s["rows_kept"])
         load.record_validation(conn, run_id, checks)
         scanned = sum(s["rows_scanned"] for s in stats_by_year.values())
 
         if summary["errors"] > 0:
             log.error("Validation found %d error(s). Nothing was loaded.", summary["errors"])
-            load.finish_run(conn, run_id, "failed_validation", rows_scanned=scanned,
-                            rows_kept=len(data), validation_errors=summary["errors"],
-                            validation_warnings=summary["warnings"],
-                            notes="Validation errors; data not loaded.")
-            result.update(status="failed_validation", validation=summary,
-                          checks=[c.as_dict() for c in checks])
+            load.finish_run(
+                conn,
+                run_id,
+                "failed_validation",
+                rows_scanned=scanned,
+                rows_kept=len(data),
+                validation_errors=summary["errors"],
+                validation_warnings=summary["warnings"],
+                notes="Validation errors; data not loaded.",
+            )
+            result.update(status="failed_validation", validation=summary, checks=[c.as_dict() for c in checks])
             return result
 
         # ---- 4. load ----
@@ -114,20 +118,43 @@ def run_pipeline(cfg, years=None, refs=None):
             raise RuntimeError(f"Post-load check failed: expected {len(data)} rows, found {in_db}")
 
         timings["total"] = round(time.perf_counter() - t_total, 2)
-        load.finish_run(conn, run_id, "success", rows_scanned=scanned, rows_kept=len(data),
-                        rows_inserted=counts["inserted"], rows_changed=counts["changed"],
-                        rows_unchanged=counts["unchanged"], rows_removed=counts["removed"],
-                        validation_errors=summary["errors"],
-                        validation_warnings=summary["warnings"], analytic_hash=digest)
-        log.info("=== run %d finished: %s inserted, %s changed, %s unchanged, %s removed (%.1fs) ===",
-                 run_id, f"{counts['inserted']:,}", f"{counts['changed']:,}",
-                 f"{counts['unchanged']:,}", f"{counts['removed']:,}", timings["total"])
+        load.finish_run(
+            conn,
+            run_id,
+            "success",
+            rows_scanned=scanned,
+            rows_kept=len(data),
+            rows_inserted=counts["inserted"],
+            rows_changed=counts["changed"],
+            rows_unchanged=counts["unchanged"],
+            rows_removed=counts["removed"],
+            validation_errors=summary["errors"],
+            validation_warnings=summary["warnings"],
+            analytic_hash=digest,
+        )
+        log.info(
+            "=== run %d finished: %s inserted, %s changed, %s unchanged, %s removed (%.1fs) ===",
+            run_id,
+            f"{counts['inserted']:,}",
+            f"{counts['changed']:,}",
+            f"{counts['unchanged']:,}",
+            f"{counts['removed']:,}",
+            timings["total"],
+        )
         if counts["removed"]:
-            log.warning("%s stored rows are no longer published by BLS. They were moved to "
-                        "qcew_annual_removed.", f"{counts['removed']:,}")
-        result.update(status="success", load=counts, analytic_hash=digest, validation=summary,
-                      rows_loaded=len(data), rows_scanned=scanned,
-                      checks=[c.as_dict() for c in checks])
+            log.warning(
+                "%s stored rows are no longer published by BLS. They were moved to qcew_annual_removed.",
+                f"{counts['removed']:,}",
+            )
+        result.update(
+            status="success",
+            load=counts,
+            analytic_hash=digest,
+            validation=summary,
+            rows_loaded=len(data),
+            rows_scanned=scanned,
+            checks=[c.as_dict() for c in checks],
+        )
         return result
 
     except load.TooManyRemovedError as err:
@@ -175,6 +202,7 @@ def main(argv=None):
 
     if result["status"] == "success" and args.export:
         from .export import export_all
+
         export_all(cfg)
 
     return 0 if result["status"] == "success" else 1

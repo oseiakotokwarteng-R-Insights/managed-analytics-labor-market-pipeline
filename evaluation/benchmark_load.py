@@ -56,8 +56,15 @@ def timed_load(conn, df, cfg, label):
     run_id = load.start_run(conn, YEARS)
     ids = {}
     for year in YEARS:
-        info = dict(year=year, url="http://example", local_name="x.zip", retrieved_at="now",
-                    download_status="bench", size_bytes=1, sha256="abc")
+        info = dict(
+            year=year,
+            url="http://example",
+            local_name="x.zip",
+            retrieved_at="now",
+            download_status="bench",
+            size_bytes=1,
+            sha256="abc",
+        )
         ids[year] = load.record_source_file(conn, run_id, info, 1, 1)
     t = time.perf_counter()
     counts = load.load_facts(conn, df, run_id, ids, cfg)

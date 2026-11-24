@@ -32,8 +32,7 @@ def check(cfg):
         window = years.window_ending_at(latest, cfg["window_years"])
         return {"mode": "auto", "latest_published": latest, "window": window, "new_data": True}
     window = years.resolve_years(cfg)
-    return {"mode": "pinned", "latest_published": latest, "window": window,
-            "new_data": latest > max(window)}
+    return {"mode": "pinned", "latest_published": latest, "window": window, "new_data": latest > max(window)}
 
 
 def _span(window):
@@ -42,13 +41,19 @@ def _span(window):
 
 def describe(result):
     if result["mode"] == "auto":
-        return (f"Newest BLS annual file: {result['latest_published']}. The pipeline follows the newest year "
-                f"automatically, so the next run will pull {_span(result['window'])}.")
+        return (
+            f"Newest BLS annual file: {result['latest_published']}. The pipeline follows the newest year "
+            f"automatically, so the next run will pull {_span(result['window'])}."
+        )
     if result["new_data"]:
-        return (f"NEW DATA: BLS has published the {result['latest_published']} annual file. "
-                f"Add it to `years` in config.toml (or set years = \"auto\") and re-run the pipeline.")
-    return (f"No new annual file yet. Latest configured year is {max(result['window'])}; "
-            f"newest published is {result['latest_published']}.")
+        return (
+            f"NEW DATA: BLS has published the {result['latest_published']} annual file. "
+            f'Add it to `years` in config.toml (or set years = "auto") and re-run the pipeline.'
+        )
+    return (
+        f"No new annual file yet. Latest configured year is {max(result['window'])}; "
+        f"newest published is {result['latest_published']}."
+    )
 
 
 def write_github_output(result):

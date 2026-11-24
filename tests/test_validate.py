@@ -54,8 +54,13 @@ def test_suppressed_row_carrying_a_zero_is_caught(clean_df, refs, cfg):
 
 def test_properly_suppressed_row_is_fine(clean_df, refs, cfg):
     suppressed = pd.DataFrame([make_row("11001", 2024, "74", "23", 0, suppressed=1)])
-    df = pd.concat([clean_df[~((clean_df.area_fips == "11001") & (clean_df.year == 2024)
-                              & (clean_df.industry_code == "23"))], suppressed], ignore_index=True)
+    df = pd.concat(
+        [
+            clean_df[~((clean_df.area_fips == "11001") & (clean_df.year == 2024) & (clean_df.industry_code == "23"))],
+            suppressed,
+        ],
+        ignore_index=True,
+    )
     res = results_by_name(df, refs, cfg)
     assert res["suppressed_values_are_null_not_zero"].passed
     assert res["suppression_rate"].failed_count == 1

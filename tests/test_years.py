@@ -14,6 +14,7 @@ def published_up_to(monkeypatch, newest):
     def fake(year, cfg):
         asked.append(year)
         return year <= newest
+
     monkeypatch.setattr(years, "year_exists", fake)
     return asked
 

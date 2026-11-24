@@ -50,15 +50,26 @@ def _add_missing_columns(conn):
 def start_run(conn, years):
     cur = conn.execute(
         "INSERT INTO pipeline_runs (started_at, status, years) VALUES (?, 'running', ?)",
-        (now_iso(), json.dumps(list(years))))
+        (now_iso(), json.dumps(list(years))),
+    )
     conn.commit()
     return cur.lastrowid
 
 
 def finish_run(conn, run_id, status, **fields):
     """Close out a run. Any extra keyword args must be column names of pipeline_runs."""
-    allowed = {"rows_scanned", "rows_kept", "rows_inserted", "rows_changed", "rows_unchanged",
-               "rows_removed", "validation_errors", "validation_warnings", "analytic_hash", "notes"}
+    allowed = {
+        "rows_scanned",
+        "rows_kept",
+        "rows_inserted",
+        "rows_changed",
+        "rows_unchanged",
+        "rows_removed",
+        "validation_errors",
+        "validation_warnings",
+        "analytic_hash",
+        "notes",
+    }
     bad = set(fields) - allowed
     if bad:
         raise ValueError(f"Unknown run fields: {bad}")
@@ -73,8 +84,19 @@ def record_source_file(conn, run_id, info, rows_scanned, rows_kept):
         """INSERT INTO source_files (run_id, year, url, local_name, retrieved_at, download_status,
                                      size_bytes, sha256, rows_scanned, rows_kept)
            VALUES (?,?,?,?,?,?,?,?,?,?)""",
-        (run_id, info["year"], info["url"], info["local_name"], info["retrieved_at"],
-         info["download_status"], info["size_bytes"], info["sha256"], rows_scanned, rows_kept))
+        (
+            run_id,
+            info["year"],
+            info["url"],
+            info["local_name"],
+            info["retrieved_at"],
+            info["download_status"],
+            info["size_bytes"],
+            info["sha256"],
+            rows_scanned,
+            rows_kept,
+        ),
+    )
     conn.commit()
     return cur.lastrowid
 
@@ -83,7 +105,8 @@ def record_validation(conn, run_id, results):
     conn.executemany(
         """INSERT INTO validation_results (run_id, check_name, level, passed, failed_count, detail)
            VALUES (?,?,?,?,?,?)""",
-        [(run_id, r.name, r.level, int(r.passed), r.failed_count, r.detail) for r in results])
+        [(run_id, r.name, r.level, int(r.passed), r.failed_count, r.detail) for r in results],
+    )
     conn.commit()
 
 
@@ -96,14 +119,21 @@ def load_reference_tables(conn, refs, cfg):
     area["area_type"] = area["area_fips"].map(area_type)
     conn.executemany(
         "INSERT OR REPLACE INTO dim_area (area_fips, area_title, state_fips, area_type) VALUES (?,?,?,?)",
-        area[["area_fips", "area_title", "state_fips", "area_type"]].itertuples(index=False, name=None))
+        area[["area_fips", "area_title", "state_fips", "area_type"]].itertuples(index=False, name=None),
+    )
 
-    conn.executemany("INSERT OR REPLACE INTO dim_industry VALUES (?,?)",
-                     refs["industry"][["industry_code", "industry_title"]].itertuples(index=False, name=None))
-    conn.executemany("INSERT OR REPLACE INTO dim_ownership VALUES (?,?)",
-                     refs["ownership"][["own_code", "own_title"]].itertuples(index=False, name=None))
-    conn.executemany("INSERT OR REPLACE INTO dim_agglevel VALUES (?,?)",
-                     refs["agglevel"][["agglvl_code", "agglvl_title"]].itertuples(index=False, name=None))
+    conn.executemany(
+        "INSERT OR REPLACE INTO dim_industry VALUES (?,?)",
+        refs["industry"][["industry_code", "industry_title"]].itertuples(index=False, name=None),
+    )
+    conn.executemany(
+        "INSERT OR REPLACE INTO dim_ownership VALUES (?,?)",
+        refs["ownership"][["own_code", "own_title"]].itertuples(index=False, name=None),
+    )
+    conn.executemany(
+        "INSERT OR REPLACE INTO dim_agglevel VALUES (?,?)",
+        refs["agglevel"][["agglvl_code", "agglvl_title"]].itertuples(index=False, name=None),
+    )
     conn.commit()
 
 
@@ -113,8 +143,11 @@ class TooManyRemovedError(Exception):
 
 
 KEY = ["area_fips", "year", "own_code", "industry_code"]
-STAGING_COLUMNS = (["area_fips", "year", "own_code", "industry_code", "agglvl_code", "disclosure_code",
-                    "is_suppressed"] + MEASURES + ["source_file_id"])
+STAGING_COLUMNS = (
+    ["area_fips", "year", "own_code", "industry_code", "agglvl_code", "disclosure_code", "is_suppressed"]
+    + MEASURES
+    + ["source_file_id"]
+)
 # Rows are copied into the staging table in pieces of this size, so memory stays flat.
 STAGING_CHUNK = 50_000
 
@@ -130,10 +163,12 @@ def _scope_filter(years, cfg):
     the years it loaded, and only the states, ownership and levels in the config.
     Narrowing the config later must never look like BLS deleting data."""
     states, own, levels = cfg["state_fips"], cfg["ownership_codes"], cfg["agglvl_codes"]
-    sql = (f"year IN ({','.join('?' * len(years))}) "
-           f"AND substr(area_fips, 1, 2) IN ({','.join('?' * len(states))}) "
-           f"AND own_code IN ({','.join('?' * len(own))}) "
-           f"AND agglvl_code IN ({','.join('?' * len(levels))})")
+    sql = (
+        f"year IN ({','.join('?' * len(years))}) "
+        f"AND substr(area_fips, 1, 2) IN ({','.join('?' * len(states))}) "
+        f"AND own_code IN ({','.join('?' * len(own))}) "
+        f"AND agglvl_code IN ({','.join('?' * len(levels))})"
+    )
     return sql, [*years, *states, *own, *levels]
 
 
@@ -167,7 +202,7 @@ def _stage(conn, df, source_ids_by_year):
     placeholders = ",".join("?" * len(STAGING_COLUMNS))
     sql = f"INSERT INTO temp.stg_qcew_annual ({', '.join(STAGING_COLUMNS)}) VALUES ({placeholders})"
     for start in range(0, len(staged), STAGING_CHUNK):
-        chunk = staged.iloc[start:start + STAGING_CHUNK]
+        chunk = staged.iloc[start : start + STAGING_CHUNK]
         conn.executemany(sql, chunk.itertuples(index=False, name=None))
 
 
@@ -201,25 +236,34 @@ def load_facts(conn, df, run_id, source_ids_by_year, cfg):
 
         # ---- work out what this load will do, before changing anything ----
         n_staged = _count(conn, "SELECT COUNT(*) FROM temp.stg_qcew_annual")
-        n_inserted = _count(conn, f"""
+        n_inserted = _count(
+            conn,
+            f"""
             SELECT COUNT(*) FROM temp.stg_qcew_annual s
-            WHERE NOT EXISTS (SELECT 1 FROM qcew_annual q WHERE {_same_key('s', 'q')})""")
-        n_changed = _count(conn, f"""
+            WHERE NOT EXISTS (SELECT 1 FROM qcew_annual q WHERE {_same_key("s", "q")})""",
+        )
+        n_changed = _count(
+            conn,
+            f"""
             SELECT COUNT(*) FROM temp.stg_qcew_annual s
-            JOIN qcew_annual q ON {_same_key('s', 'q')} WHERE {differs}""")
+            JOIN qcew_annual q ON {_same_key("s", "q")} WHERE {differs}""",
+        )
         n_unchanged = n_staged - n_inserted - n_changed
         # One pass over the stored rows in scope: how many there are, and how many are no longer published.
         stored_in_scope, n_removed = conn.execute(
-            f"SELECT COUNT(*), COALESCE(SUM(NOT {same_as_staged}), 0) FROM qcew_annual NOT INDEXED "
-            f"WHERE {scope_sql}", scope_params).fetchone()
+            f"SELECT COUNT(*), COALESCE(SUM(NOT {same_as_staged}), 0) FROM qcew_annual NOT INDEXED WHERE {scope_sql}",
+            scope_params,
+        ).fetchone()
         if stored_in_scope and n_removed / stored_in_scope > max_fraction:
             raise TooManyRemovedError(
                 f"{n_removed:,} of {stored_in_scope:,} stored rows ({n_removed / stored_in_scope:.1%}) are missing "
-                f"from the new data, more than the {max_fraction:.0%} limit. Nothing was changed.")
+                f"from the new data, more than the {max_fraction:.0%} limit. Nothing was changed."
+            )
 
         # ---- rows BLS stopped publishing: archive, then remove ----
         if n_removed:
-            conn.execute(f"""
+            conn.execute(
+                f"""
                 INSERT INTO qcew_annual_removed (area_fips, year, own_code, industry_code, agglvl_code,
                        disclosure_code, is_suppressed, establishments, employment, total_wages,
                        avg_weekly_wage, avg_annual_pay, source_file_id, last_run_id, removed_run_id, removed_at)
@@ -227,12 +271,15 @@ def load_facts(conn, df, run_id, source_ids_by_year, cfg):
                        disclosure_code, is_suppressed, establishments, employment, total_wages,
                        avg_weekly_wage, avg_annual_pay, source_file_id, last_run_id, ?, ?
                 FROM qcew_annual NOT INDEXED WHERE {scope_sql} AND NOT {same_as_staged}""",
-                [run_id, now_iso(), *scope_params])
-            conn.execute(f"DELETE FROM qcew_annual NOT INDEXED WHERE {scope_sql} AND NOT {same_as_staged}",
-                         scope_params)
+                [run_id, now_iso(), *scope_params],
+            )
+            conn.execute(
+                f"DELETE FROM qcew_annual NOT INDEXED WHERE {scope_sql} AND NOT {same_as_staged}", scope_params
+            )
 
         # ---- insert new rows and update existing ones ----
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO qcew_annual (area_fips, year, own_code, industry_code, agglvl_code,
                 disclosure_code, is_suppressed, establishments, employment, total_wages,
                 avg_weekly_wage, avg_annual_pay, source_file_id, last_run_id)
@@ -250,7 +297,9 @@ def load_facts(conn, df, run_id, source_ids_by_year, cfg):
                 avg_weekly_wage = excluded.avg_weekly_wage,
                 avg_annual_pay = excluded.avg_annual_pay,
                 source_file_id = excluded.source_file_id,
-                last_run_id = excluded.last_run_id""", [run_id])
+                last_run_id = excluded.last_run_id""",
+            [run_id],
+        )
         conn.commit()
     except Exception:
         conn.rollback()
@@ -270,7 +319,8 @@ def analytic_hash(conn):
     cur = conn.execute(
         """SELECT area_fips, year, own_code, industry_code, agglvl_code, disclosure_code,
                   is_suppressed, establishments, employment, total_wages, avg_weekly_wage, avg_annual_pay
-           FROM qcew_annual ORDER BY area_fips, year, own_code, industry_code""")
+           FROM qcew_annual ORDER BY area_fips, year, own_code, industry_code"""
+    )
     for row in cur:
         h.update(repr(row).encode("utf-8"))
     return h.hexdigest()

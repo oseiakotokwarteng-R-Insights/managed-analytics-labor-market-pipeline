@@ -51,8 +51,18 @@ def delete_db(cfg):
 
 def slim(result):
     """Keep the parts of a run result that are worth writing down."""
-    keep = ["run_id", "status", "years", "timings_seconds", "load", "analytic_hash",
-            "validation", "rows_loaded", "rows_scanned", "error"]
+    keep = [
+        "run_id",
+        "status",
+        "years",
+        "timings_seconds",
+        "load",
+        "analytic_hash",
+        "validation",
+        "rows_loaded",
+        "rows_scanned",
+        "error",
+    ]
     return {k: result[k] for k in keep if k in result}
 
 
@@ -74,16 +84,14 @@ def evaluate_runs(cfg, refs):
     again = run_pipeline(cfg, refs=refs)
     out["repeat_run_same_database"] = slim(again)
     out["repeat_run_same_database"]["rows_in_database"] = row_count(cfg["paths"]["db_path"])
-    out["repeat_run_same_database"]["same_data_as_cold_run"] = (
-        again.get("analytic_hash") == cold.get("analytic_hash"))
+    out["repeat_run_same_database"]["same_data_as_cold_run"] = again.get("analytic_hash") == cold.get("analytic_hash")
 
     # Rebuild: throw the database away and load again from the downloaded files.
     delete_db(cfg)
     rebuilt = run_pipeline(cfg, refs=refs)
     out["rebuild_from_scratch"] = slim(rebuilt)
     out["rebuild_from_scratch"]["rows_in_database"] = row_count(cfg["paths"]["db_path"])
-    out["rebuild_from_scratch"]["same_data_as_cold_run"] = (
-        rebuilt.get("analytic_hash") == cold.get("analytic_hash"))
+    out["rebuild_from_scratch"]["same_data_as_cold_run"] = rebuilt.get("analytic_hash") == cold.get("analytic_hash")
     return out
 
 
@@ -92,8 +100,7 @@ def load_standardized_frame(cfg):
     """Pull the loaded data back out of the database in the pipeline's own column layout."""
     conn = load.connect(cfg["paths"]["db_path"])
     try:
-        df = pd.read_sql_query(
-            f"SELECT {', '.join(transform.OUTPUT_COLUMNS)} FROM qcew_annual", conn)
+        df = pd.read_sql_query(f"SELECT {', '.join(transform.OUTPUT_COLUMNS)} FROM qcew_annual", conn)
     finally:
         conn.close()
     return df
@@ -103,8 +110,7 @@ def evaluate_fault_injection(cfg, refs):
     """Break a copy of the real data in specific ways and see which check notices."""
     base = load_standardized_frame(cfg)
     years = cfg["years"]
-    county_total = base[(base.agglvl_code == "71") & (~base.area_fips.str.endswith("999"))
-                        & base.employment.notna()]
+    county_total = base[(base.agglvl_code == "71") & (~base.area_fips.str.endswith("999")) & base.employment.notna()]
     sector_row = base[(base.agglvl_code == "74") & base.employment.notna()].iloc[0]
 
     def pick(frame):
@@ -117,12 +123,14 @@ def evaluate_fault_injection(cfg, refs):
         df = make(df)
         results = validate.run_checks(df, refs, cfg, years)
         failed = [r.name for r in results if not r.passed and r.level != "info"]
-        faults.append({
-            "injected_fault": name,
-            "expected_check": expected_check,
-            "caught_by_expected_check": expected_check in failed,
-            "all_checks_that_fired": failed,
-        })
+        faults.append(
+            {
+                "injected_fault": name,
+                "expected_check": expected_check,
+                "caught_by_expected_check": expected_check in failed,
+                "all_checks_that_fired": failed,
+            }
+        )
 
     def duplicate_row(df):
         return pd.concat([df, df.iloc[[0]]], ignore_index=True)
@@ -208,16 +216,18 @@ def evaluate_failure_scenarios(cfg, refs):
         conn = load.connect(cfg["paths"]["db_path"])
         hash_after = load.analytic_hash(conn)
         conn.close()
-        scenarios.append({
-            "scenario": name,
-            "expected_status": expected_status,
-            "actual_status": result["status"],
-            "behaved_as_expected": result["status"] == expected_status,
-            "database_rows_before": rows_before,
-            "database_rows_after": row_count(cfg["paths"]["db_path"]),
-            "data_unchanged": hash_after == hash_before,
-            "message": result.get("error") or json.dumps(result.get("validation", {})),
-        })
+        scenarios.append(
+            {
+                "scenario": name,
+                "expected_status": expected_status,
+                "actual_status": result["status"],
+                "behaved_as_expected": result["status"] == expected_status,
+                "database_rows_before": rows_before,
+                "database_rows_after": row_count(cfg["paths"]["db_path"]),
+                "data_unchanged": hash_after == hash_before,
+                "message": result.get("error") or json.dumps(result.get("validation", {})),
+            }
+        )
 
     # a) A year BLS hasn't published.
     c = copy.deepcopy(cfg)
@@ -247,10 +257,13 @@ def write_markdown(res, path):
     cold, rep, reb = res["cold_run"], res["repeat_run_same_database"], res["rebuild_from_scratch"]
     f = res["fault_injection"]
     lines = [
-        "# Pipeline evaluation results", "",
+        "# Pipeline evaluation results",
+        "",
         f"Run on {res['environment']['date']} - {res['environment']['platform']}, "
-        f"Python {res['environment']['python']}, pandas {res['environment']['pandas']}.", "",
-        "## Runs", "",
+        f"Python {res['environment']['python']}, pandas {res['environment']['pandas']}.",
+        "",
+        "## Runs",
+        "",
         "| Scenario | Status | Seconds (total) | Rows inserted | Rows changed | Same data as cold run |",
         "|---|---|---|---|---|---|",
         f"| Cold run (downloads files) | {cold['status']} | {cold['timings_seconds'].get('total')} | "
@@ -259,17 +272,29 @@ def write_markdown(res, path):
         f"{rep['load']['inserted']:,} | {rep['load']['changed']:,} | {rep['same_data_as_cold_run']} |",
         f"| Rebuild from scratch | {reb['status']} | {reb['timings_seconds'].get('total')} | "
         f"{reb['load']['inserted']:,} | {reb['load']['changed']:,} | {reb['same_data_as_cold_run']} |",
-        "", f"Rows in database: {cold['rows_in_database']:,}. Database size: {cold['database_size_mb']} MB.", "",
-        "## Faults I injected on purpose", "",
+        "",
+        f"Rows in database: {cold['rows_in_database']:,}. Database size: {cold['database_size_mb']} MB.",
+        "",
+        "## Faults I injected on purpose",
+        "",
         f"{f['caught']} of {f['total']} injected faults were caught by the check built for them. "
-        f"The unmodified data failed {len(f['clean_data_failed_checks'])} checks.", "",
-        "| Injected fault | Expected check | Caught |", "|---|---|---|",
+        f"The unmodified data failed {len(f['clean_data_failed_checks'])} checks.",
+        "",
+        "| Injected fault | Expected check | Caught |",
+        "|---|---|---|",
     ]
     for item in f["faults"]:
-        lines.append(f"| {item['injected_fault']} | `{item['expected_check']}` | "
-                     f"{'yes' if item['caught_by_expected_check'] else 'NO'} |")
-    lines += ["", "## Things going wrong", "",
-              "| Scenario | Expected | Actual | Data left unchanged |", "|---|---|---|---|"]
+        lines.append(
+            f"| {item['injected_fault']} | `{item['expected_check']}` | "
+            f"{'yes' if item['caught_by_expected_check'] else 'NO'} |"
+        )
+    lines += [
+        "",
+        "## Things going wrong",
+        "",
+        "| Scenario | Expected | Actual | Data left unchanged |",
+        "|---|---|---|---|",
+    ]
     for s in res["failure_scenarios"]:
         lines.append(f"| {s['scenario']} | {s['expected_status']} | {s['actual_status']} | {s['data_unchanged']} |")
     Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -277,7 +302,7 @@ def write_markdown(res, path):
 
 def main():
     cfg = load_config()
-    cfg["years"] = resolve_years(cfg)       # the evaluation needs the actual list of years
+    cfg["years"] = resolve_years(cfg)  # the evaluation needs the actual list of years
     out_dir = Path(cfg["paths"]["output_dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
     setup_logging(out_dir, "evaluation_" + time.strftime("%Y%m%d_%H%M%S"))
@@ -295,12 +320,14 @@ def main():
         print("Fault injection re-run. See", out_dir / "evaluation_summary.md")
         return
 
-    results = {"environment": {
-        "date": time.strftime("%Y-%m-%d"),
-        "platform": platform.platform(),
-        "python": platform.python_version(),
-        "pandas": pd.__version__,
-    }}
+    results = {
+        "environment": {
+            "date": time.strftime("%Y-%m-%d"),
+            "platform": platform.platform(),
+            "python": platform.python_version(),
+            "pandas": pd.__version__,
+        }
+    }
     results.update(evaluate_runs(cfg, refs))
     results["fault_injection"] = evaluate_fault_injection(cfg, refs)
     results["failure_scenarios"] = evaluate_failure_scenarios(cfg, refs)

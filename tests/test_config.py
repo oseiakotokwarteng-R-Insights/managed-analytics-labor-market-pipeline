@@ -13,7 +13,7 @@ def test_the_default_settings_load_and_paths_become_absolute(monkeypatch):
         monkeypatch.delenv(name, raising=False)
     cfg = load_config()
     assert cfg["years"] == "auto" and cfg["window_years"] == 5
-    assert cfg["paths"]["db_path"] == Path.cwd() / "data" / "qcew_dmv.sqlite"    # relative to where it is run
+    assert cfg["paths"]["db_path"] == Path.cwd() / "data" / "qcew_dmv.sqlite"  # relative to where it is run
     assert all(Path(p).is_absolute() for p in cfg["paths"].values())
 
 

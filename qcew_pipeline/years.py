@@ -21,8 +21,7 @@ class CheckError(Exception):
 def year_exists(year, cfg):
     """True if BLS has published the annual file for this year, False if it has not (404)."""
     url = cfg["urls"]["annual_file"].format(year=year)
-    req = urllib.request.Request(url, method="HEAD",
-                                 headers={"User-Agent": cfg["download"]["user_agent"]})
+    req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": cfg["download"]["user_agent"]})
     try:
         with urllib.request.urlopen(req, timeout=cfg["download"]["timeout_seconds"]) as resp:
             return resp.status == 200

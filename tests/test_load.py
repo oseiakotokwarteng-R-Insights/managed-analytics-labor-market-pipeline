@@ -18,8 +18,15 @@ def fresh_db(cfg, refs):
 def fake_sources(conn, run_id):
     ids = {}
     for year in (2023, 2024):
-        info = dict(year=year, url="http://example", local_name="x.zip", retrieved_at="now",
-                    download_status="test", size_bytes=1, sha256="abc")
+        info = dict(
+            year=year,
+            url="http://example",
+            local_name="x.zip",
+            retrieved_at="now",
+            download_status="test",
+            size_bytes=1,
+            sha256="abc",
+        )
         ids[year] = load.record_source_file(conn, run_id, info, 10, 10)
     return ids
 
@@ -38,9 +45,9 @@ def test_running_the_load_twice_does_not_create_duplicates(cfg, refs, clean_df):
     first_hash = load.analytic_hash(conn)
 
     second = load.load_facts(conn, clean_df, run_id, ids, cfg)
-    assert load.count_rows(conn) == len(clean_df)          # same row count
+    assert load.count_rows(conn) == len(clean_df)  # same row count
     assert second == {"inserted": 0, "changed": 0, "unchanged": len(clean_df), "removed": 0}
-    assert load.analytic_hash(conn) == first_hash          # and identical data
+    assert load.analytic_hash(conn) == first_hash  # and identical data
 
 
 def test_a_revised_value_is_counted_as_changed(cfg, refs, clean_df):
@@ -61,11 +68,11 @@ def test_a_revised_value_is_counted_as_changed(cfg, refs, clean_df):
 def test_suppressed_values_are_stored_as_null(cfg, refs, clean_df):
     conn, run_id = fresh_db(cfg, refs)
     clean_df.loc[2, ["is_suppressed", "disclosure_code"]] = [1, "N"]
-    clean_df.loc[2, ["establishments", "employment", "total_wages", "avg_weekly_wage",
-                     "avg_annual_pay"]] = float("nan")
+    clean_df.loc[2, ["establishments", "employment", "total_wages", "avg_weekly_wage", "avg_annual_pay"]] = float("nan")
     load.load_facts(conn, clean_df, run_id, fake_sources(conn, run_id), cfg)
-    stored = conn.execute("SELECT COUNT(*) FROM qcew_annual WHERE is_suppressed = 1 "
-                          "AND employment IS NULL").fetchone()[0]
+    stored = conn.execute("SELECT COUNT(*) FROM qcew_annual WHERE is_suppressed = 1 AND employment IS NULL").fetchone()[
+        0
+    ]
     assert stored == 1
 
 
@@ -79,26 +86,28 @@ def test_database_refuses_rows_with_unknown_codes(cfg, refs, clean_df):
         pass
     else:
         raise AssertionError("expected the database to reject the unknown area code")
-    assert load.count_rows(conn) == 0     # and the failed load left nothing behind
+    assert load.count_rows(conn) == 0  # and the failed load left nothing behind
 
 
 # ---------------------------------------------------------------- rows BLS stops publishing
 def test_a_row_bls_stops_publishing_is_archived_and_counted(cfg, refs, clean_df):
-    cfg["load"]["max_removed_fraction"] = 0.5          # a tiny fake dataset: one row is a big share
+    cfg["load"]["max_removed_fraction"] = 0.5  # a tiny fake dataset: one row is a big share
     conn, run_id = fresh_db(cfg, refs)
     ids = fake_sources(conn, run_id)
     load.load_facts(conn, clean_df, run_id, ids, cfg)
 
-    dropped = clean_df.iloc[[3]]                       # pretend BLS no longer publishes this row
+    dropped = clean_df.iloc[[3]]  # pretend BLS no longer publishes this row
     gone = dropped.iloc[0]
     counts = load.load_facts(conn, clean_df.drop(index=3), run_id, ids, cfg)
 
     assert counts["removed"] == 1 and counts["inserted"] == 0
     assert load.count_rows(conn) == len(clean_df) - 1
     archived = conn.execute(
-        "SELECT area_fips, year, industry_code, employment, removed_run_id FROM qcew_annual_removed").fetchall()
-    assert archived == [(gone["area_fips"], int(gone["year"]), gone["industry_code"],
-                         float(gone["employment"]), run_id)]
+        "SELECT area_fips, year, industry_code, employment, removed_run_id FROM qcew_annual_removed"
+    ).fetchall()
+    assert archived == [
+        (gone["area_fips"], int(gone["year"]), gone["industry_code"], float(gone["employment"]), run_id)
+    ]
 
 
 def test_a_row_that_comes_back_is_loaded_again_and_the_history_stays(cfg, refs, clean_df):
@@ -124,7 +133,7 @@ def test_rows_outside_the_loaded_years_are_left_alone(cfg, refs, clean_df):
     counts = load.load_facts(conn, only_2024, run_id, ids, cfg)
 
     assert counts["removed"] == 0
-    assert load.count_rows(conn) == len(clean_df)       # the 2023 rows are still there
+    assert load.count_rows(conn) == len(clean_df)  # the 2023 rows are still there
 
 
 def test_narrowing_the_config_does_not_look_like_bls_removing_data(cfg, refs, clean_df):
@@ -132,12 +141,12 @@ def test_narrowing_the_config_does_not_look_like_bls_removing_data(cfg, refs, cl
     ids = fake_sources(conn, run_id)
     load.load_facts(conn, clean_df, run_id, ids, cfg)
 
-    cfg["state_fips"] = ["11", "24"]                     # drop Virginia from the settings
+    cfg["state_fips"] = ["11", "24"]  # drop Virginia from the settings
     without_virginia = clean_df[~clean_df["area_fips"].str.startswith("51")]
     counts = load.load_facts(conn, without_virginia, run_id, ids, cfg)
 
     assert counts["removed"] == 0
-    assert load.count_rows(conn) == len(clean_df)       # Virginia's rows were not touched
+    assert load.count_rows(conn) == len(clean_df)  # Virginia's rows were not touched
 
 
 def test_losing_too_many_rows_stops_the_load_and_changes_nothing(cfg, refs, clean_df):
@@ -146,7 +155,7 @@ def test_losing_too_many_rows_stops_the_load_and_changes_nothing(cfg, refs, clea
     load.load_facts(conn, clean_df, run_id, ids, cfg)
     before = load.analytic_hash(conn)
 
-    half = clean_df.iloc[::2]                            # every other row, in both years: far above the 5% limit
+    half = clean_df.iloc[::2]  # every other row, in both years: far above the 5% limit
     try:
         load.load_facts(conn, half, run_id, ids, cfg)
     except load.TooManyRemovedError:
@@ -183,7 +192,7 @@ def test_the_staging_table_is_cleaned_up_after_a_failed_load(cfg, refs, clean_df
     ids = fake_sources(conn, run_id)
     load.load_facts(conn, clean_df, run_id, ids, cfg)
     try:
-        load.load_facts(conn, clean_df.iloc[::2], run_id, ids, cfg)      # too many rows would go
+        load.load_facts(conn, clean_df.iloc[::2], run_id, ids, cfg)  # too many rows would go
     except load.TooManyRemovedError:
         pass
     assert staging_tables(conn) == []
@@ -195,7 +204,7 @@ def test_a_chunk_size_smaller_than_the_data_gives_the_same_result(cfg, refs, cle
     load.load_facts(conn_a, clean_df, run_a, fake_sources(conn_a, run_a), cfg)
     expected = load.analytic_hash(conn_a)
 
-    monkeypatch.setattr(load, "STAGING_CHUNK", 4)                       # many small pieces
+    monkeypatch.setattr(load, "STAGING_CHUNK", 4)  # many small pieces
     cfg["paths"]["db_path"] = cfg["paths"]["db_path"].with_name("chunked.sqlite")
     conn_b, run_b = fresh_db(cfg, refs)
     counts = load.load_facts(conn_b, clean_df, run_b, fake_sources(conn_b, run_b), cfg)
