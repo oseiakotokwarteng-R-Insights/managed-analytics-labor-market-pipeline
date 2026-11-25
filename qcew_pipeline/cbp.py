@@ -25,7 +25,6 @@ businesses, and since 2020 it also adds a little random noise to the ones it sho
 
 import argparse
 import logging
-import re
 import sys
 import zipfile
 from datetime import UTC, datetime

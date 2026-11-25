@@ -210,7 +210,6 @@ def both_sources(cfg, refs, clean_df, tmp_path):
     def add(factor=None, withhold=(), years=(2023, 2024)):
         """Save CBP rows for every QCEW county row. `factor` maps an area to how much bigger CBP's number is."""
         factor = factor or {}
-        frames = []
         for year in years:
             q = clean_df[(clean_df["year"] == year) & clean_df["agglvl_code"].isin(["71", "74"])]
             df = pd.DataFrame(
