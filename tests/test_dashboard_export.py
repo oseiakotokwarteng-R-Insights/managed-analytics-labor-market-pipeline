@@ -121,7 +121,8 @@ def test_state_names_come_from_the_code_not_the_title(loaded, cfg, tmp_path):
 
 def test_industry_titles_lose_the_code_in_front(loaded, cfg, tmp_path):
     loaded.execute(
-        "UPDATE dim_industry SET industry_title = 'NAICS 62 Health care and social assistance' WHERE industry_code = '62'"
+        "UPDATE dim_industry SET industry_title = 'NAICS 62 Health care and social assistance' "
+        "WHERE industry_code = '62'"
     )
     loaded.execute("UPDATE dim_industry SET industry_title = '23 Construction' WHERE industry_code = '23'")
     loaded.commit()
