@@ -328,9 +328,12 @@ def command(monkeypatch, cfg, refs, clean_df, tmp_path):
 
     def fake_download(year, config):
         asked.append(year)
-        rows = [census_row(state=a[:2], county=a[2:], emp=str(int(e)), est=str(int(s)))
-                for a, e, s in clean_df[(clean_df["year"] == year) & (clean_df["agglvl_code"] == "71")][
-                    ["area_fips", "employment", "establishments"]].itertuples(index=False)]
+        rows = [
+            census_row(state=a[:2], county=a[2:], emp=str(int(e)), est=str(int(s)))
+            for a, e, s in clean_df[(clean_df["year"] == year) & (clean_df["agglvl_code"] == "71")][
+                ["area_fips", "employment", "establishments"]
+            ].itertuples(index=False)
+        ]
         path = census_zip(tmp_path, rows, name=f"cbp{year % 100}co.zip")
         return {**INFO, "year": year, "local_path": str(path), "local_name": path.name}
 
