@@ -82,7 +82,7 @@ def _years(conn, cfg):
 def _by_year(rows, years, fields):
     """Rows for one place or industry, as lists lined up with `years` (null where a year is missing)."""
     index = {int(r["year"]): r for r in rows}
-    out = {name: [] for name in fields}
+    out: dict[str, list] = {name: [] for name in fields}
     out["hidden"] = []
     for year in years:
         row = index.get(year)
@@ -232,7 +232,7 @@ def _state_table(conn, cfg, years, states):
             WHERE q.own_code = '5' AND q.agglvl_code IN ('51', '71') AND a.state_fips IN ({marks})""",
         list(cfg["state_fips"]),
     ).fetchall()
-    table = {}
+    table: dict[tuple[str, int], dict] = {}
     for r in rows:
         cell = table.setdefault(
             (r["state_fips"], int(r["year"])),
