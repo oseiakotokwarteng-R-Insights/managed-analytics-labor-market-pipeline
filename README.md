@@ -25,10 +25,12 @@ I ran it in Google Colab from a fresh copy of this repository. It downloaded the
 
 One thing I noticed: the share of values BLS hides keeps going up. It was about 24% in 2021 and 2022, 28% in 2024, and 36% in 2025. The 2025 file also has about 16% fewer rows nationally than 2024. I don't know why yet. The pipeline recorded these numbers but didn't say anything about them, so I added two warnings. One is for a big jump in the share of hidden values from one year to the next, and the other is for a big change in how many rows BLS published. Both would have flagged 2025. They don't stop a run. They show up in the log and in the database so I can go and look.
 
+I also ran the analytics layer on the same real data. dbt built one seed, five views and three summary tables, and ran 40 tests. All 49 passed, once I'd fixed a mistake the tests found (more on that below). Then I compared the database, pandas and dbt on the real numbers: 16,262 rows, 790 county-years, 15,200 county-sector-years, 15 state-years and 790 year-over-year changes. Every one matched, with no differences at all.
+
 ## What I'm working on
 
 1. **Make it sturdier.** Done. It now notices rows BLS removes, loads faster, follows the newest year by itself, warns when the data suddenly changes shape, runs in Docker, and has style and type checks.
-2. **An analytics layer.** The Parquet files and the dbt project with its tests are written. Still to do: check on the real data that the dbt numbers match what the database says.
+2. **An analytics layer.** Done. The Parquet files, the dbt project with its tests, and a check on the real data that the dbt numbers match what the database says.
 3. **Scheduling and alerts.** Dagster to run it on a schedule, and an email when something needs attention.
 4. **More sources.** A second source, checks between the two, and California added by changing a setting instead of the code.
 5. **A small dashboard** for people who don't want to write SQL.
@@ -53,13 +55,15 @@ On top of the Parquet files there's a small dbt project in the `analytics` folde
 qcew-build
 ```
 
-The tests include the ones I care most about. A hidden value must never be a zero. No two rows can share the same key. Every code must exist in BLS's own list. The counties must add up to the state total, and the sectors must never add up to more than the county. If one fails, the build fails. The limits come from `config.toml`, the same ones the pipeline uses.
+The tests include the ones I care most about. A hidden value must never be a zero. No two rows can share the same key. Every code must exist in BLS's own list. The counties must add up to the state total, and the sectors must never add up to more than the county. If one fails, the build fails. The limits come from `config.toml`, the same ones the pipeline uses. If a notebook or a DuckDB shell still has `data/analytics.duckdb` open, close it first, because DuckDB only lets one program write to a file at a time. `qcew-build` tells you when that's the problem.
 
 ### Something the tests caught
 
 The first time I ran the dbt tests on the real data, one of them failed. In Maryland and Virginia the counties added up to about 4% to 7% less than the state total that BLS published. The pipeline's own check had said everything matched, so something was off.
 
 The reason is a bucket BLS calls "unknown or undefined". It holds jobs that BLS can't place in a single county. The pipeline's check had always counted that bucket. My first dbt table only looked at real counties, so it left the bucket out, and the numbers didn't add up. The test was right and my table was wrong. The state table now shows the named counties, the bucket, and the state total side by side, and the test checks that they add up. It's worth knowing before you read anything into county numbers: in Maryland and Virginia a few percent of the state's jobs don't belong to any county.
+
+On the real data, that bucket holds between 4.4% and 5.7% of Maryland's private-sector jobs and between 5.3% and 6.6% of Virginia's, depending on the year. In DC it's about 0.01% to 0.02%, because DC is a single county. With the bucket counted, the counties and the state total agree to within a few parts in a million, which is just rounding in BLS's own numbers.
 
 ## Try it
 

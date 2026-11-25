@@ -2,6 +2,8 @@
 and dbt and are skipped where those aren't installed. CI runs them."""
 
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -188,3 +190,25 @@ def test_a_state_total_that_the_counties_and_the_bucket_cannot_explain_fails_the
 
     assert build(cfg) is False
     assert build(cfg, select="assert_county_sums_match_state_totals") is False
+
+
+def test_a_database_held_open_by_another_program_gives_a_plain_message(cfg, refs, clean_df):
+    publish_fake_data(cfg, refs, clean_df)
+    assert build(cfg) is True  # this creates the analytics database file
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import duckdb, sys, time; con = duckdb.connect(sys.argv[1]); print('ready', flush=True); time.sleep(60)",
+            str(cfg["paths"]["analytics_db"]),
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout.readline().strip() == "ready"
+        with pytest.raises(analytics.AnalyticsError, match="open in another program"):
+            build(cfg)
+    finally:
+        holder.kill()
+        holder.wait()

@@ -58,6 +58,22 @@ sys.exit(0 if result.success else 1)
 """
 
 
+def _check_database_is_free(db):
+    """dbt writes to the analytics database, and DuckDB lets only one program write to a file at a time.
+    If a notebook or a DuckDB shell still has the file open, say so in plain words instead of showing dbt's trace."""
+    if not db.exists():
+        return
+    import duckdb
+
+    try:
+        duckdb.connect(str(db)).close()
+    except duckdb.IOException as err:
+        raise AnalyticsError(
+            f"The analytics database ({db}) is open in another program, so dbt can't write to it. "
+            f"Close that connection (a notebook cell or a DuckDB shell, for example) and run again. DuckDB said: {err}"
+        ) from err
+
+
 def build_analytics(cfg, project_dir=None, select=None):
     """Run dbt build (seeds, models and tests). Returns True only if every model built and every test passed."""
     lake = Path(cfg["paths"]["lake_dir"])
@@ -70,6 +86,7 @@ def build_analytics(cfg, project_dir=None, select=None):
     out = Path(cfg["paths"]["output_dir"]) / "dbt"
     db = Path(cfg["paths"]["analytics_db"])
     db.parent.mkdir(parents=True, exist_ok=True)
+    _check_database_is_free(db)
     limits = {
         "state_gap_tolerance": cfg["validation"]["state_reconciliation_tolerance"],
         "sector_sum_tolerance": cfg["validation"]["sector_sum_tolerance"],
