@@ -31,7 +31,7 @@ This describes every table and field in `data/qcew_dmv.sqlite`. All numbers come
 
 ## `dim_area`, `dim_industry`, `dim_ownership`, `dim_agglevel`
 
-Lookup tables loaded directly from BLS's published code files.
+These lookup tables come straight from BLS's own code files.
 
 | Table | Fields |
 |---|---|
@@ -50,11 +50,11 @@ Lookup tables loaded directly from BLS's published code files.
 | `dim_area.parquet`, `dim_industry.parquet`, `dim_ownership.parquet`, `dim_agglevel.parquet` | The code lists with their names, the same as the database tables. |
 | `manifest.json` | When it was published, the row count for each table and year, and the `analytic_hash` of the database state it was written from. |
 
-Hidden values are empty in the files, not zero. Every publish replaces the whole folder, so it always matches the database exactly.
+Hidden values are empty in the files, not zero. Every publish replaces the whole folder, so the files always match the database exactly.
 
 ## `qcew_annual_removed`
 
-Rows that were once in `qcew_annual` but that BLS stopped publishing. They are moved here instead of being deleted, so nothing is lost. It has the same columns as `qcew_annual`, plus `removed_run_id` (the run that noticed) and `removed_at` (UTC time). There is no primary key, because a row can be removed, come back, and be removed again.
+Rows that used to be in `qcew_annual` but that BLS stopped publishing. I move them here instead of deleting them, so nothing is lost. It has the same columns as `qcew_annual`, plus `removed_run_id` (the run that noticed) and `removed_at` (UTC time). There's no primary key, because a row can be removed, come back, and be removed again.
 
 ## `pipeline_runs`
 
@@ -109,7 +109,7 @@ One row per check per run: `check_name`, `level` (error / warn / info), `passed`
 | `suppression_rate_stable` | warn | A year whose share of hidden values is more than 5 points higher than the year before. |
 | `source_rows_stable` | warn | A year whose national BLS file has more than 10% more or fewer rows than the year before. |
 
-Errors stop the load. Warnings are recorded and left for a human to look at.
+Errors stop the load. Warnings are written down for me to look at.
 
 ## Views
 

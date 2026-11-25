@@ -31,7 +31,7 @@ I also ran the analytics layer on the same real data. dbt built one seed, five v
 
 1. **Make it sturdier.** Done. It now notices rows BLS removes, loads faster, follows the newest year by itself, warns when the data suddenly changes shape, runs in Docker, and has style and type checks.
 2. **An analytics layer.** Done. The Parquet files, the dbt project with its tests, and a check on the real data that the dbt numbers match what the database says.
-3. **Scheduling and alerts.** Dagster to run it on a schedule, and an email when something needs attention.
+3. **Scheduling.** Dagster to run it on a schedule, and to show how the data flows from one step to the next.
 4. **More sources.** A second source, checks between the two, and California added by changing a setting instead of the code.
 5. **A small dashboard** for people who don't want to write SQL.
 6. **A forecast** of employment, compared against simple baselines and tested on data it hasn't seen.

@@ -2,51 +2,66 @@
 
 ```mermaid
 flowchart LR
-    A[BLS annual QCEW files<br/>one zip per year] --> B[collect.py<br/>download, hash, log]
-    R[BLS code files<br/>areas, industries, ownership] --> B
-    B --> C[transform.py<br/>filter to DC/MD/VA, rename,<br/>fix types, suppressed to NULL]
+    A[BLS yearly QCEW files] --> B[collect.py<br/>download, fingerprint, log]
+    R[BLS code lists<br/>areas, industries, ownership] --> B
+    B --> C[transform.py<br/>keep DC, MD and VA, fix types,<br/>hidden values become empty]
     C --> D{validate.py<br/>18 checks}
-    D -- any error --> F[Stop. Record the failure.<br/>Nothing is loaded.]
-    D -- pass or warnings only --> E[load.py<br/>upsert into SQLite]
+    D -- real error --> F[Stop and record why.<br/>Nothing is saved.]
+    D -- pass, or warnings only --> E[load.py<br/>save to SQLite]
     E --> G[(qcew_dmv.sqlite)]
     G --> H[export.py<br/>CSV files]
-    G --> I[sql/example_queries.sql]
+    G --> P[publish.py<br/>Parquet files]
+    P --> Q[dbt and DuckDB<br/>summary tables and tests]
+    Q --> X[cross-check<br/>database vs pandas vs dbt]
 ```
 
 ## What each file does
 
-| File | Job |
+| File | What it does |
 |---|---|
-| `qcew_pipeline/config.toml` | The settings: which years, states, ownership, tolerances, file locations. Ships inside the package. |
-| `qcew_pipeline/schema.sql` | The database layout (also ships inside the package). |
-| `pyproject.toml` | Packaging (installs `qcew-run` and `qcew-check-updates`), plus the settings for pytest, ruff and mypy. |
-| `Dockerfile` | Runs the pipeline in a container. Built and smoke-tested in CI. |
-| `qcew_pipeline/years.py` | Works out which years to pull. With `years = "auto"` it asks BLS (header requests only) for the newest published year and uses the most recent `window_years` years ending there. |
-| `qcew_pipeline/collect.py` | Downloads the annual zips (with retries) and BLS lookup tables, and records each file's size and SHA-256 fingerprint. |
-| `qcew_pipeline/transform.py` | Reads each national file in chunks, keeps only the rows I want, renames columns, fixes types, and turns suppressed values into NULL. |
-| `qcew_pipeline/validate.py` | Runs the checks. Errors block the load; warnings get recorded. |
-| `qcew_pipeline/load.py` | Creates the schema, loads the lookup tables, copies the new rows into a temporary staging table, then lets SQLite work out what is new, changed or removed and do the upsert, all in one transaction. Also computes a fingerprint of the data. |
-| `qcew_pipeline/publish.py` | Writes the database out as Parquet files (one folder per year, plus the code lists and a manifest). Builds the new folder next to the old one and then swaps them, so nobody reads a half-written set. Needs DuckDB. |
-| `qcew_pipeline/analytics.py` | Runs the dbt project in the `analytics` folder on the Parquet files. It sets the paths, passes in the limits from `config.toml`, and turns dbt's result into an exit code. Needs the analytics extras. |
-| `analytics/` | The dbt project. Staging views clean the Parquet files, three summary tables are built from them, and tests check keys, codes, the hidden-values rule and the county, state and sector totals. |
-| `qcew_pipeline/run.py` | Runs all steps in order with logging and timing, and decides what to do on failure. |
-| `qcew_pipeline/export.py` | Writes CSVs from the database. |
-| `qcew_pipeline/check_updates.py` | Asks BLS (header request only) whether a newer annual file exists. Exits with 2 if BLS can't be reached, so a broken check is never mistaken for 'no news'. |
-| `.github/workflows/pipeline.yml` | Runs style, type and unit checks and a Docker build on every push, checks for new data monthly and opens a GitHub issue (once per year of data) when there is some, and can run the pipeline on demand. |
+| `qcew_pipeline/config.toml` | The settings: which years and states, the limits for the checks, and where files go. It ships inside the package. |
+| `qcew_pipeline/schema.sql` | The layout of the database. It also ships inside the package. |
+| `pyproject.toml` | Packaging. It installs the `qcew-run`, `qcew-check-updates`, `qcew-publish` and `qcew-build` commands, and holds the settings for pytest, ruff and mypy. |
+| `Dockerfile` | Runs the pipeline in a container. GitHub builds it and starts it on every push to make sure it works. |
+| `qcew_pipeline/years.py` | Works out which years to pull. With `years = "auto"` it asks BLS for the newest published year and takes that year plus the four before it. |
+| `qcew_pipeline/collect.py` | Downloads the yearly zip files, with retries, and the BLS code lists. It records each file's size and SHA-256 fingerprint. |
+| `qcew_pipeline/transform.py` | Reads each national file in pieces, keeps only the rows I want, renames the columns, fixes the types, and turns hidden values into empty ones. |
+| `qcew_pipeline/validate.py` | Runs the checks. Errors stop the load. Warnings get written down. |
+| `qcew_pipeline/load.py` | Saves the data to SQLite. It copies the new rows into a temporary table and lets SQLite work out what's new, what changed and what BLS dropped, all in one transaction. It also works out a fingerprint of the data. |
+| `qcew_pipeline/publish.py` | Writes the database out as Parquet files: one folder per year, the code lists, and a manifest. It builds the new folder next to the old one and then swaps them, so nobody ever reads a half-written set. Needs DuckDB. |
+| `qcew_pipeline/analytics.py` | Runs the dbt project in the `analytics` folder on the Parquet files. It sets the paths, passes in the limits from `config.toml`, and turns dbt's result into an exit code. |
+| `analytics/` | The dbt project. Staging views clean up the Parquet files, three summary tables are built from them, and tests check the keys, the codes, the hidden-values rule, and the county, state and sector totals. |
+| `qcew_pipeline/run.py` | Runs all the steps in order, with logging and timing, and decides what to do when something fails. |
+| `qcew_pipeline/export.py` | Writes CSV files from the database. |
+| `qcew_pipeline/check_updates.py` | Asks BLS whether there's a newer yearly file. If it can't reach BLS it exits with code 2, so a broken check never looks like "no news". |
+| `.github/workflows/pipeline.yml` | On every push it runs the style, type and unit checks and builds the Docker image. Once a month it checks for new data and opens a GitHub issue if there's a new year. You can also start the pipeline from there by hand. |
 
-## Decisions worth knowing about
+## Choices I made, and why
 
-* **Fail the whole run if one year fails.** If a download or a check fails for one year, nothing is loaded. A multi-year table with a silent hole in it would be worse than no new data.
-* **Validate before loading.** The database only ever contains data that passed the error-level checks.
-* **Two stores, two jobs.** SQLite is where the pipeline keeps its books: the run history, the check results, the rows BLS removed. The Parquet files are what the analytics layer reads. Every Parquet row carries the fingerprint of the file it came from, and the manifest records which state of the database it was written from, so the two can always be matched up.
-* **Check the published files again, in SQL.** The pipeline already checks the data before it loads it. The dbt tests check it again after it has been published, with different code, so a mistake in the publish step or in one of the two ways of checking can't hide. If the two ever disagree, I want to know why.
-* **Jobs that belong to no county are counted, not dropped.** BLS keeps a bucket called "unknown or undefined" for jobs it can't place in one county. The state table shows it next to the named counties, and the test checks that counties plus the bucket add up to the state total. The first version of the dbt table left the bucket out, and the test failed on the real data. That is the kind of mistake the second set of checks is there to find.
-* **Hidden values never become numbers in the summary tables.** A change from one year to the next, or a sector's share of a county, is left empty when either number is hidden. Nothing is estimated or filled in.
-* **Warn about drift, don't stop for it.** Two warnings compare each year with the one before: a big jump in the share of hidden values, and a big change in how many rows BLS published. Either could be a real change at BLS or a problem with the file, and I can't tell which from here, so they are recorded and I look into them. The limits are in `config.toml`. They only compare years inside the same run.
-* **A rolling window of years.** By default the pipeline pulls the five most recent years and always includes the newest one BLS has published, so a new release is picked up without editing anything. Years that fall out of the window stay in the database and are simply no longer refreshed. Pin a fixed list in `config.toml` when you need a frozen, reproducible set.
-* **Stage, then compare inside the database.** The new rows are copied into a temporary table and SQLite does the comparing and the upsert as set operations. The stored table is never read into pandas and there is no row-by-row Python loop. On 600,000 made-up rows (about four times the real DMV data) a rerun took 7.6 s instead of 22.5 s, and a typical revision 9.5 s instead of 21.3 s (`python evaluation/benchmark_load.py --rows 600000`). The new rows themselves are still held in memory, so there is a ceiling; the next step past it would be loading year by year.
-* **Upsert, not append.** Re-running can't create duplicates, and changed values are counted so BLS revisions are visible.
-* **Removed rows are archived, not ignored.** If BLS stops publishing a row, it moves to `qcew_annual_removed` and is counted on the run. Only rows for the years, states and sectors in the run are considered, so narrowing `config.toml` never looks like BLS deleting data.
-* **A load that would remove too much stops.** If more than `max_removed_fraction` (5%) of the stored rows in scope would go, the run fails and changes nothing. A normal revision touches a handful of rows; a big loss means the new file is wrong.
-* **One main source.** Only QCEW. The state-total rows in the same file are used as an independent cross-check on the county rows.
-* **Private sector only.** Government employment is covered and paid differently, so mixing it in would make county comparisons harder to interpret.
+**If one year fails, the whole run fails.** If a download or a check goes wrong for one year, nothing is loaded. A table with a silent hole in the middle is worse than no new data.
+
+**Check first, then load.** The database only ever holds data that passed the checks that can stop a run.
+
+**Two stores, two jobs.** SQLite is where the pipeline keeps its books: the run history, the check results, the rows BLS removed. The Parquet files are what the analytics layer reads. Every Parquet row carries the fingerprint of the file it came from, and the manifest says which state of the database the files were written from, so the two can always be matched up.
+
+**Check the published files a second time.** The pipeline checks the data before it loads it. The dbt tests check it again after it's published, with different code, so a mistake in the publish step, or in either set of checks, can't hide. If the two ever disagree, I want to know why.
+
+**Jobs that belong to no county are counted, not dropped.** BLS keeps a bucket called "unknown or undefined" for jobs it can't place in one county. The state table shows it next to the named counties, and a test checks that the counties plus the bucket add up to the state total. My first dbt table left the bucket out, and the test failed on the real data. That's exactly the kind of mistake the second set of checks is there to find.
+
+**Hidden values never turn into numbers.** In the summary tables, a change from one year to the next, or a sector's share of a county, is left empty when either number is hidden. Nothing is estimated or filled in.
+
+**Warn about drift, don't stop for it.** Two warnings compare each year with the one before: a big jump in the share of hidden values, and a big change in how many rows BLS published. Either one could be a real change at BLS or a problem with the file, and I can't tell which from here. So they're written down and I look into them. The limits are in `config.toml`. They only compare years inside the same run.
+
+**A rolling window of years.** By default the pipeline pulls the five most recent years, always including the newest one BLS has published, so a new release gets picked up without anyone editing anything. Years that drop out of the window stay in the database. They just stop being refreshed. If you need a frozen, repeatable set, put a fixed list of years in `config.toml`.
+
+**Stage first, then compare inside the database.** The new rows go into a temporary table, and SQLite does the comparing and the saving itself. The stored table is never pulled into pandas, and there's no row-by-row Python loop. On 600,000 made-up rows, about four times the real DMV data, a rerun took 7.6 seconds instead of 22.5, and a typical revision took 9.5 instead of 21.3 (`python evaluation/benchmark_load.py --rows 600000`). The new rows are still held in memory, so there's a ceiling. The next step past it would be loading one year at a time.
+
+**Save, don't append.** Running it again can't create duplicates, and changed values are counted so BLS revisions are easy to see.
+
+**Rows BLS removes are archived.** If BLS stops publishing a row, it moves to `qcew_annual_removed` and the run counts it. I only look at the years, states and sectors in the run, so narrowing `config.toml` never looks like BLS deleting data.
+
+**A load that would remove too much stops.** If more than `max_removed_fraction` (5%) of the stored rows would go, the run fails and changes nothing. A normal revision touches a handful of rows. A big loss means the new file is wrong.
+
+**One main source.** Only QCEW. The state-total rows in the same file give me an independent check on the county rows.
+
+**Private sector only.** Government jobs are counted and paid differently, so mixing them in would make county comparisons harder to read.
