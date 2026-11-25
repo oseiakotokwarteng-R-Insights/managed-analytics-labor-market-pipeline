@@ -31,6 +31,7 @@ flowchart LR
 | `qcew_pipeline/publish.py` | Writes the database out as Parquet files: one folder per year, the code lists, and a manifest. It builds the new folder next to the old one and then swaps them, so nobody ever reads a half-written set. Needs DuckDB. |
 | `qcew_pipeline/analytics.py` | Runs the dbt project in the `analytics` folder on the Parquet files. It sets the paths, passes in the limits from `config.toml`, and turns dbt's result into an exit code. |
 | `analytics/` | The dbt project. Staging views clean up the Parquet files, three summary tables are built from them, and tests check the keys, the codes, the hidden-values rule, and the county, state and sector totals. |
+| `qcew_pipeline/orchestration.py` | The Dagster layer. Three steps (database, Parquet files, analytics tables) that call the same code as the commands above, two checks on them, one job, a monthly schedule, and a sensor that watches for a new year from BLS. Needs the `orchestration` extras. |
 | `qcew_pipeline/run.py` | Runs all the steps in order, with logging and timing, and decides what to do when something fails. |
 | `qcew_pipeline/export.py` | Writes CSV files from the database. |
 | `qcew_pipeline/check_updates.py` | Asks BLS whether there's a newer yearly file. If it can't reach BLS it exits with code 2, so a broken check never looks like "no news". |
@@ -61,6 +62,12 @@ flowchart LR
 **Rows BLS removes are archived.** If BLS stops publishing a row, it moves to `qcew_annual_removed` and the run counts it. I only look at the years, states and sectors in the run, so narrowing `config.toml` never looks like BLS deleting data.
 
 **A load that would remove too much stops.** If more than `max_removed_fraction` (5%) of the stored rows would go, the run fails and changes nothing. A normal revision touches a handful of rows. A big loss means the new file is wrong.
+
+**Dagster calls the code, it doesn't hold it.** Every Dagster step is a few lines around `run_pipeline`, `publish_lake` or `build_analytics`. If Dagster went away tomorrow, nothing about how the data is checked or loaded would change, and the command line would still work.
+
+**Nothing runs on its own until I say so.** The schedule and the sensor start switched off. A pipeline that downloads about 390 MB shouldn't start doing it just because someone opened the Dagster screen.
+
+**One run per new year.** The sensor gives each year it finds a run key, so if it ticks again before the first run has finished, it doesn't start a second one. If it can't reach BLS it fails, for the same reason `qcew-check-updates` exits with code 2.
 
 **One main source.** Only QCEW. The state-total rows in the same file give me an independent check on the county rows.
 

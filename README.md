@@ -31,7 +31,7 @@ I also ran the analytics layer on the same real data. dbt built one seed, five v
 
 1. **Make it sturdier.** Done. It now notices rows BLS removes, loads faster, follows the newest year by itself, warns when the data suddenly changes shape, runs in Docker, and has style and type checks.
 2. **An analytics layer.** Done. The Parquet files, the dbt project with its tests, and a check on the real data that the dbt numbers match what the database says.
-3. **Scheduling.** Dagster to run it on a schedule, and to show how the data flows from one step to the next.
+3. **Scheduling.** Done. Dagster shows how the data flows from one step to the next, a schedule refreshes it once a month, and a sensor starts a run when BLS publishes a new year.
 4. **More sources.** A second source, checks between the two, and California added by changing a setting instead of the code.
 5. **A small dashboard** for people who don't want to write SQL.
 6. **A forecast** of employment, compared against simple baselines and tested on data it hasn't seen.
@@ -64,6 +64,23 @@ The first time I ran the dbt tests on the real data, one of them failed. In Mary
 The reason is a bucket BLS calls "unknown or undefined". It holds jobs that BLS can't place in a single county. The pipeline's check had always counted that bucket. My first dbt table only looked at real counties, so it left the bucket out, and the numbers didn't add up. The test was right and my table was wrong. The state table now shows the named counties, the bucket, and the state total side by side, and the test checks that they add up. It's worth knowing before you read anything into county numbers: in Maryland and Virginia a few percent of the state's jobs don't belong to any county.
 
 On the real data, that bucket holds between 4.4% and 5.7% of Maryland's private-sector jobs and between 5.3% and 6.6% of Virginia's, depending on the year. In DC it's about 0.01% to 0.02%, because DC is a single county. With the bucket counted, the counties and the state total agree to within a few parts in a million, which is just rounding in BLS's own numbers.
+
+## Scheduling with Dagster
+
+Dagster is a tool that runs data jobs and shows how the pieces connect. I used it to put the pipeline's three big steps on a picture and on a schedule, without changing how any of them work. Each Dagster step calls the same code as the commands above, so the command line and Dagster always do the same thing.
+
+```bash
+pip install -e ".[orchestration]"
+dagster dev
+```
+
+Then open `http://localhost:3000`. You'll see three steps in a row: the database, the Parquet files, and the analytics tables. Two checks sit on them. One warns when the validation step raised any warnings, like the drift ones. The other runs the cross-check, which asks the database, pandas and dbt the same questions and compares the answers.
+
+There's one job that refreshes all three. There's a schedule that runs it on the first of every month, and a sensor that asks BLS once a day whether it has published a year the database doesn't have yet. If it has, the sensor starts a run, once for that year. If BLS can't be reached, the sensor fails and says so, so a broken check never looks like "no news".
+
+The schedule and the sensor start switched off, so nothing downloads anything until you turn them on in the Dagster screen. Set `DAGSTER_HOME` to a folder first if you want Dagster to remember its run history, and set `QCEW_CONFIG` if you use your own settings file.
+
+I tested this part with automated tests that stand in for the real work, so they run in seconds and never download anything. They check how the steps are connected, what each one reports when it works or fails, and when the sensor asks for a run. I haven't run the Dagster version against the real BLS files yet.
 
 ## Try it
 
