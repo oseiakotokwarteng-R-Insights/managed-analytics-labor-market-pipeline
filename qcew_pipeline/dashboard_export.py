@@ -23,6 +23,7 @@ A number BLS hid stays null in these files. It's never turned into a zero, so th
 
 import argparse
 import json
+import re
 import shutil
 import sqlite3
 import sys
@@ -54,8 +55,34 @@ def _num(value):
     return value
 
 
-def _state_name(title):
-    return title.replace(" -- Statewide", "").strip()
+# State names by FIPS code. BLS's own titles for the state rows aren't reliable enough to show (the real title
+# for DC is "District of Columbia, not unknown"), so the names come from here and the titles are only a fallback.
+STATE_NAMES = {
+    "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas", "06": "California", "08": "Colorado",
+    "09": "Connecticut", "10": "Delaware", "11": "District of Columbia", "12": "Florida", "13": "Georgia",
+    "15": "Hawaii", "16": "Idaho", "17": "Illinois", "18": "Indiana", "19": "Iowa", "20": "Kansas",
+    "21": "Kentucky", "22": "Louisiana", "23": "Maine", "24": "Maryland", "25": "Massachusetts",
+    "26": "Michigan", "27": "Minnesota", "28": "Mississippi", "29": "Missouri", "30": "Montana",
+    "31": "Nebraska", "32": "Nevada", "33": "New Hampshire", "34": "New Jersey", "35": "New Mexico",
+    "36": "New York", "37": "North Carolina", "38": "North Dakota", "39": "Ohio", "40": "Oklahoma",
+    "41": "Oregon", "42": "Pennsylvania", "44": "Rhode Island", "45": "South Carolina", "46": "South Dakota",
+    "47": "Tennessee", "48": "Texas", "49": "Utah", "50": "Vermont", "51": "Virginia", "53": "Washington",
+    "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming", "72": "Puerto Rico",
+}  # fmt: skip
+
+
+def _state_name(fips, title):
+    return STATE_NAMES.get(fips) or _clean_area_title(title).replace(" -- Statewide", "").strip()
+
+
+def _clean_area_title(title):
+    """BLS writes DC as 'District of Columbia, not unknown'. People should just see 'District of Columbia'."""
+    return re.sub(r",\s*not unknown$", "", title or "").strip()
+
+
+def _clean_industry_title(title):
+    """BLS industry titles start with the code ('NAICS 54 Professional...'). The code has its own field."""
+    return re.sub(r"^(NAICS\s+)?[\d-]+\s+", "", title or "").strip()
 
 
 def _connect(cfg):
@@ -100,7 +127,7 @@ def _states(conn, cfg):
         "ORDER BY state_fips",
         list(cfg["state_fips"]),
     ).fetchall()
-    return [{"fips": r["state_fips"], "name": _state_name(r["area_title"])} for r in rows]
+    return [{"fips": r["state_fips"], "name": _state_name(r["state_fips"], r["area_title"])} for r in rows]
 
 
 def _meta(conn, cfg, years, states):
@@ -169,7 +196,7 @@ def _counties(conn, cfg, years):
     titles: dict[str, tuple[str, str]] = {}
     for r in rows:
         grouped.setdefault(r["area_fips"], []).append(r)
-        titles[r["area_fips"]] = (r["area_title"], r["state_fips"])
+        titles[r["area_fips"]] = (_clean_area_title(r["area_title"]), r["state_fips"])
     counties = []
     for fips, county_rows in grouped.items():
         series = _by_year(county_rows, years, ["employment", "avg_weekly_wage", "establishments"])
@@ -202,8 +229,9 @@ def _sectors(conn, cfg, years):
     ).fetchall()
     by_county: dict[str, dict] = {}
     for r in rows:
-        county = by_county.setdefault(r["area_fips"], {"title": r["area_title"], "sectors": {}})
-        county["sectors"].setdefault(r["industry_code"], {"title": r["industry_title"], "rows": []})["rows"].append(r)
+        county = by_county.setdefault(r["area_fips"], {"title": _clean_area_title(r["area_title"]), "sectors": {}})
+        sector = {"title": _clean_industry_title(r["industry_title"]), "rows": []}
+        county["sectors"].setdefault(r["industry_code"], sector)["rows"].append(r)
     out = {}
     for fips, county in by_county.items():
         sectors = []

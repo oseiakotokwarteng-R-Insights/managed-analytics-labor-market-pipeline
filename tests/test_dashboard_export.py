@@ -96,6 +96,66 @@ def test_the_checks_file_has_the_last_runs_results_and_the_history(loaded, cfg, 
     assert data["history"][0]["status"] == "success" and data["history"][0]["rows_inserted"] == 34
 
 
+# ---------------------------------------------------------------- names, as BLS really writes them
+
+
+def test_dc_is_shown_by_its_name_not_by_the_odd_title_bls_uses(loaded, cfg, tmp_path):
+    loaded.execute(
+        "UPDATE dim_area SET area_title = 'District of Columbia, not unknown' WHERE area_fips IN ('11000', '11001')"
+    )
+    loaded.commit()
+    out, _ = export(cfg, tmp_path)
+    assert read(out, "meta.json")["states"][0] == {"fips": "11", "name": "District of Columbia"}
+    county = {c["fips"]: c for c in read(out, "counties.json")["counties"]}["11001"]
+    assert county["title"] == "District of Columbia"
+    assert read(out, "sectors/11001.json")["title"] == "District of Columbia"
+    assert next(r for r in read(out, "states.json")["rows"] if r["state"] == "11")["name"] == "District of Columbia"
+
+
+def test_state_names_come_from_the_code_not_the_title(loaded, cfg, tmp_path):
+    loaded.execute("UPDATE dim_area SET area_title = 'Some odd title' WHERE area_fips = '24000'")
+    loaded.commit()
+    out, _ = export(cfg, tmp_path)
+    assert [s["name"] for s in read(out, "meta.json")["states"]] == ["District of Columbia", "Maryland", "Virginia"]
+
+
+def test_industry_titles_lose_the_code_in_front(loaded, cfg, tmp_path):
+    loaded.execute(
+        "UPDATE dim_industry SET industry_title = 'NAICS 62 Health care and social assistance' WHERE industry_code = '62'"
+    )
+    loaded.execute("UPDATE dim_industry SET industry_title = '23 Construction' WHERE industry_code = '23'")
+    loaded.commit()
+    out, _ = export(cfg, tmp_path)
+    sectors = {s["code"]: s["title"] for s in read(out, "sectors/24003.json")["sectors"]}
+    assert sectors == {"23": "Construction", "62": "Health care and social assistance"}
+
+
+@pytest.mark.parametrize(
+    ("raw", "clean"),
+    [
+        ("NAICS 31-33 Manufacturing", "Manufacturing"),
+        ("NAICS 99 Unclassified", "Unclassified"),
+        ("44-45 Retail trade", "Retail trade"),
+        ("Health care", "Health care"),  # nothing to remove
+        ("", ""),
+    ],
+)
+def test_industry_title_cleaning(raw, clean):
+    assert de._clean_industry_title(raw) == clean
+
+
+@pytest.mark.parametrize(
+    ("raw", "clean"),
+    [
+        ("District of Columbia, not unknown", "District of Columbia"),
+        ("Montgomery County, Maryland", "Montgomery County, Maryland"),
+        ("Maryland -- Statewide", "Maryland -- Statewide"),
+    ],
+)
+def test_area_title_cleaning(raw, clean):
+    assert de._clean_area_title(raw) == clean
+
+
 # ---------------------------------------------------------------- hidden numbers
 
 

@@ -51,6 +51,7 @@ jobs:
           name: pipeline-run
           path: |
             ${{ runner.temp }}/out
+            ${{ runner.temp }}/qcew.sqlite
             site/data
       - name: Save the files on the dashboard-data branch
         run: |
