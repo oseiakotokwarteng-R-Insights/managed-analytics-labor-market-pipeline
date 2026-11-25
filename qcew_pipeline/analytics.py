@@ -20,7 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .config import load_config
+from .config import add_region_argument, load_config
 
 
 class AnalyticsError(Exception):
@@ -119,10 +119,11 @@ def main(argv=None):
         description="Build the analytics layer (dbt models and tests) from the Parquet files."
     )
     parser.add_argument("--config", help="path to a config.toml (default: the one inside the package)")
+    add_region_argument(parser)
     parser.add_argument("--select", help="build only these models or tests, using dbt's selection syntax")
     args = parser.parse_args(argv)
 
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.region)
     try:
         passed = build_analytics(cfg, select=args.select)
     except ModuleNotFoundError as err:

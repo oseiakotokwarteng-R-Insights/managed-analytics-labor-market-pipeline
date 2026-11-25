@@ -21,7 +21,7 @@ def built(cfg, refs, clean_df, monkeypatch):
     conn.close()
     publish.publish_lake(cfg)
     assert analytics.build_analytics(cfg, project_dir=PROJECT) is True
-    monkeypatch.setattr(cc, "load_config", lambda path=None: cfg)
+    monkeypatch.setattr(cc, "load_config", lambda path=None, region=None: cfg)
     return cfg
 
 
@@ -76,7 +76,7 @@ def test_a_missing_row_in_a_dbt_table_is_caught(built, capsys):
 
 
 def test_running_before_building_gives_a_clear_message(cfg, capsys, monkeypatch):
-    monkeypatch.setattr(cc, "load_config", lambda path=None: cfg)
+    monkeypatch.setattr(cc, "load_config", lambda path=None, region=None: cfg)
 
     assert cc.main([]) == 2
 
@@ -87,7 +87,7 @@ def test_the_state_check_counts_the_jobs_that_belong_to_no_county(cfg, refs, cle
     refs2, df2 = with_an_undefined_bucket(refs, clean_df)
     publish_fake_data(cfg, refs2, df2)
     assert analytics.build_analytics(cfg, project_dir=PROJECT) is True
-    monkeypatch.setattr(cc, "load_config", lambda path=None: cfg)
+    monkeypatch.setattr(cc, "load_config", lambda path=None, region=None: cfg)
 
     assert cc.main([]) == 0
 

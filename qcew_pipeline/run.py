@@ -20,7 +20,7 @@ from pathlib import Path
 import pandas as pd
 
 from . import collect, load, transform, validate
-from .config import load_config
+from .config import add_region_argument, load_config
 from .years import CheckError, resolve_years
 
 log = logging.getLogger("qcew")
@@ -180,8 +180,9 @@ def run_pipeline(cfg, years=None, refs=None):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Run the QCEW DMV data pipeline.")
+    parser = argparse.ArgumentParser(description="Run the QCEW data pipeline.")
     parser.add_argument("--config", help="path to a config.toml (default: the one inside the package)")
+    add_region_argument(parser)
     parser.add_argument("--years", nargs="+", type=int, help="override the years in the config")
     parser.add_argument("--export", action="store_true", help="write CSV exports after a successful run")
     parser.add_argument(
@@ -191,7 +192,7 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
 
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.region)
     stamp = time.strftime("%Y%m%d_%H%M%S")
     log_file = setup_logging(cfg["paths"]["output_dir"], stamp)
     try:

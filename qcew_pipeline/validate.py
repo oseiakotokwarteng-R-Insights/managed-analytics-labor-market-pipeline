@@ -103,7 +103,7 @@ def run_checks(df, refs, cfg, years_expected, rows_by_year=None, scanned_by_year
 
     bad_state = int((~df["area_fips"].str[:2].isin(cfg["state_fips"])).sum())
     results.append(
-        _result("areas_inside_requested_states", "error", bad_state, f"{bad_state} rows are outside DC/MD/VA")
+        _result("areas_inside_requested_states", "error", bad_state, f"{bad_state} rows are outside the requested states")
     )
 
     bad_year = int((~df["year"].isin(years_expected)).sum())

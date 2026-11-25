@@ -1,6 +1,6 @@
 # Data dictionary
 
-This describes every table and field in `data/qcew_dmv.sqlite`. All numbers come from the Bureau of Labor Statistics' Quarterly Census of Employment and Wages (QCEW) annual files. I only reshape and check them; I don't estimate or adjust anything.
+This describes every table and field in the database (`data/qcew_dmv.sqlite` for DC, Maryland and Virginia, and `data/qcew_california.sqlite` for California; the tables are the same). All numbers come from the Bureau of Labor Statistics' Quarterly Census of Employment and Wages (QCEW) annual files. I only reshape and check them; I don't estimate or adjust anything.
 
 **What one row means:** one area (state or county), in one year, for one ownership group and one industry level. In this project the ownership group is always **private sector**.
 

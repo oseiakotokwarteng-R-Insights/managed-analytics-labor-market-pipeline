@@ -19,7 +19,7 @@ def cli(monkeypatch, cfg):
             seen["years"] = years
             return {"status": status, "years": years}
 
-        monkeypatch.setattr(run, "load_config", lambda path=None: cfg)
+        monkeypatch.setattr(run, "load_config", lambda path=None, region=None: cfg)
         monkeypatch.setattr(run, "run_pipeline", fake_run)
         monkeypatch.setattr(export, "export_all", lambda c: seen.__setitem__("exported", True))
         return seen
@@ -95,3 +95,17 @@ def test_publishing_without_duckdb_installed_exits_two_with_a_helpful_message(cl
 
     cli("success")
     assert run.main(["--publish"]) == 2
+
+
+def test_the_region_flag_reaches_the_settings_loader(monkeypatch, cfg):
+    asked = []
+
+    def load(path=None, region=None):
+        asked.append(region)
+        return cfg
+
+    monkeypatch.setattr(run, "load_config", load)
+    monkeypatch.setattr(run, "run_pipeline", lambda config, years=None, refs=None: {"status": "success", "years": years})
+    run.main(["--region", "california"])
+    run.main([])
+    assert asked == ["california", None]  # nothing given means the settings or the default decide

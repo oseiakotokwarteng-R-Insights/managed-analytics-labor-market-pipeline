@@ -1,4 +1,4 @@
-"""Step 2: turn a giant national file into a small, tidy DMV table.
+"""Step 2: turn a giant national file into a small, tidy table for the states I picked.
 
 The BLS annual file has every county in the country and a lot of columns I
 don't need. I read it in chunks (so it never has to fit in memory), keep only

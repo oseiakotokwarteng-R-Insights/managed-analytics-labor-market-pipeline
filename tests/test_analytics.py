@@ -120,7 +120,7 @@ def test_a_hidden_value_stored_as_zero_fails_the_build(cfg, refs, clean_df):
 
 
 def test_building_before_publishing_is_refused_with_a_clear_message(cfg, capsys, monkeypatch):
-    monkeypatch.setattr(analytics, "load_config", lambda path=None: cfg)
+    monkeypatch.setattr(analytics, "load_config", lambda path=None, region=None: cfg)
 
     assert analytics.main([]) == 2
 

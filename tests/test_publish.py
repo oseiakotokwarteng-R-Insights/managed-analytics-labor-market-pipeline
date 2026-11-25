@@ -127,7 +127,7 @@ def test_an_empty_database_is_refused_and_nothing_is_written(cfg, refs, tmp_path
 
 
 def test_the_command_line_publishes_to_the_folder_it_is_given(cfg, loaded, monkeypatch, capsys):
-    monkeypatch.setattr(publish, "load_config", lambda path=None: cfg)
+    monkeypatch.setattr(publish, "load_config", lambda path=None, region=None: cfg)
 
     assert publish.main(["--out", str(loaded)]) == 0
 

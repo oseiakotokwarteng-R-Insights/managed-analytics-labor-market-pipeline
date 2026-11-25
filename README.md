@@ -2,7 +2,7 @@
 
 This project takes job and wage numbers that the Bureau of Labor Statistics (BLS) gives away for free, cleans them up, checks them, and saves them in one small database that anyone can ask questions of. It's a sample project from [Managed Analytics](https://managedanalytics.co). I built it on public data so you can look at every step.
 
-The numbers come from a BLS program called the Quarterly Census of Employment and Wages, or QCEW for short. It counts jobs, businesses and wages, county by county. This project covers Washington DC, Maryland and Virginia, and private-sector jobs only.
+The numbers come from a BLS program called the Quarterly Census of Employment and Wages, or QCEW for short. It counts jobs, businesses and wages, county by county. By default this project covers Washington DC, Maryland and Virginia (California is built in too), and private-sector jobs only.
 
 ## Where it came from
 
@@ -32,7 +32,7 @@ I also ran the analytics layer on the same real data. dbt built one seed, five v
 1. **Make it sturdier.** Done. It now notices rows BLS removes, loads faster, follows the newest year by itself, warns when the data suddenly changes shape, runs in Docker, and has style and type checks.
 2. **An analytics layer.** Done. The Parquet files, the dbt project with its tests, and a check on the real data that the dbt numbers match what the database says.
 3. **Scheduling.** Done. Dagster shows how the data flows from one step to the next, a schedule refreshes it once a month, and a sensor starts a run when BLS publishes a new year.
-4. **More sources.** A second source, checks between the two, and California added by changing a setting instead of the code.
+4. **More regions and a second source.** California is in, and it's one setting (see "Another region" below). A second source, with checks between the two, is next.
 5. **A small dashboard** for people who don't want to write SQL.
 6. **A forecast** of employment, compared against simple baselines and tested on data it hasn't seen.
 
@@ -104,6 +104,20 @@ docker run --rm -v "$PWD/data:/app/data" -v "$PWD/outputs:/app/outputs" qcew-pip
 ```
 
 The database ends up in `./data` and the logs and CSV files in `./outputs`. Anything you type after the image name goes to the program, like `--years 2025`.
+
+### Another region
+
+The default is Washington DC, Maryland and Virginia. California is built in too, and you switch to it with one setting. Nothing in the code changes.
+
+```bash
+qcew-run --region california
+```
+
+You can also set `region = "california"` in your settings file, or set the `QCEW_REGION` environment variable. The same `--region` option works on `qcew-publish`, `qcew-build` and the cross-check. Each region gets its own database and its own Parquet and analytics files, so running one never touches another. The big BLS downloads are national files, so every region reuses the same ones, and a second region doesn't download anything new.
+
+The states, the number of counties to expect, and the file names for each region are in [`qcew_pipeline/regions.toml`](qcew_pipeline/regions.toml). To add a region, copy one of the blocks and change it. If you put your own `state_fips` in your settings file, that wins over the region.
+
+I haven't run the California setting on the real BLS files yet. The tests check that the setting works, that only California rows are kept, and that DC, Maryland and Virginia behave exactly as before. The real data could still show me something I didn't expect, like a county count that's off, and the validation step would flag it.
 
 ### Checking for new data
 

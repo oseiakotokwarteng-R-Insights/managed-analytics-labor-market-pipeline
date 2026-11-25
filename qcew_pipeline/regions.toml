@@ -1,0 +1,33 @@
+# Ready-made settings for a group of states.
+#
+# Pick one with `region = "..."` in config.toml, with --region on the commands, or with the QCEW_REGION
+# environment variable. Anything you set yourself in your own settings file wins over what's here.
+#
+# Each region gets its own database, Parquet folder and analytics file, so running one never touches
+# another. The big BLS downloads are national files, so every region reuses the same ones.
+#
+# To add a region, copy one of these blocks, change the state codes, the county counts and the file
+# names, and give it a name. No code needs to change.
+
+[dmv]
+name = "DC, Maryland and Virginia"
+state_fips = ["11", "24", "51"]
+db_path = "data/qcew_dmv.sqlite"
+lake_dir = "data/lake"
+analytics_db = "data/analytics.duckdb"
+
+[dmv.expected_county_counts]
+# Counties and county-equivalents (independent cities count in Virginia).
+"11" = 1
+"24" = 24
+"51" = 133
+
+[california]
+name = "California"
+state_fips = ["06"]
+db_path = "data/qcew_california.sqlite"
+lake_dir = "data/lake_california"
+analytics_db = "data/analytics_california.duckdb"
+
+[california.expected_county_counts]
+"06" = 58

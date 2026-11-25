@@ -37,7 +37,7 @@ Homepage = "https://managedanalytics.co"
 packages = ["qcew_pipeline"]
 
 [tool.setuptools.package-data]
-qcew_pipeline = ["config.toml", "schema.sql"]
+qcew_pipeline = ["config.toml", "regions.toml", "schema.sql"]
 
 [tool.dagster]
 module_name = "qcew_pipeline.orchestration"

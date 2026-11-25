@@ -19,7 +19,8 @@ flowchart LR
 
 | File | What it does |
 |---|---|
-| `qcew_pipeline/config.toml` | The settings: which years and states, the limits for the checks, and where files go. It ships inside the package. |
+| `qcew_pipeline/config.toml` | The settings: which years, which region, the limits for the checks, and where files go. It ships inside the package. |
+| `qcew_pipeline/regions.toml` | The ready-made regions (DC, Maryland and Virginia, and California): the state codes, how many counties to expect, and the file names for each. It ships inside the package too. |
 | `qcew_pipeline/schema.sql` | The layout of the database. It also ships inside the package. |
 | `pyproject.toml` | Packaging. It installs the `qcew-run`, `qcew-check-updates`, `qcew-publish` and `qcew-build` commands, and holds the settings for pytest, ruff and mypy. |
 | `Dockerfile` | Runs the pipeline in a container. GitHub builds it and starts it on every push to make sure it works. |
@@ -52,6 +53,10 @@ flowchart LR
 **Hidden values never turn into numbers.** In the summary tables, a change from one year to the next, or a sector's share of a county, is left empty when either number is hidden. Nothing is estimated or filled in.
 
 **Warn about drift, don't stop for it.** Two warnings compare each year with the one before: a big jump in the share of hidden values, and a big change in how many rows BLS published. Either one could be a real change at BLS or a problem with the file, and I can't tell which from here. So they're written down and I look into them. The limits are in `config.toml`. They only compare years inside the same run.
+
+**A region is a setting, not code.** The states, the expected county counts and the file names live in `regions.toml`. Switching to California is `--region california`, and no Python changes. Each region gets its own database and its own Parquet and analytics files, so one can never overwrite another. If you put your own states in the settings file, they win over the region.
+
+**One set of downloads for every region.** BLS publishes the annual file for the whole country, so a new region only changes which rows I keep. It doesn't download anything new.
 
 **A rolling window of years.** By default the pipeline pulls the five most recent years, always including the newest one BLS has published, so a new release gets picked up without anyone editing anything. Years that drop out of the window stay in the database. They just stop being refreshed. If you need a frozen, repeatable set, put a fixed list of years in `config.toml`.
 

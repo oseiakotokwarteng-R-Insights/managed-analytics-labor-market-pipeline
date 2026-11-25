@@ -22,7 +22,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from qcew_pipeline import load  # noqa: E402
-from qcew_pipeline.config import load_config  # noqa: E402
+from qcew_pipeline.config import add_region_argument, load_config  # noqa: E402
 
 TOLERANCE = 1e-9
 EXAMPLES = 5
@@ -238,9 +238,10 @@ def report(results):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Check that the dbt tables match the database.")
     parser.add_argument("--config", help="path to a config.toml (default: the one inside the package)")
+    add_region_argument(parser)
     args = parser.parse_args(argv)
 
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.region)
     try:
         results = run_checks(cfg)
     except ModuleNotFoundError as err:

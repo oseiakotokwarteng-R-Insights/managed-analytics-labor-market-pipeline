@@ -11,8 +11,11 @@
 years = "auto"
 window_years = 5
 
-# State FIPS codes: 11 = District of Columbia, 24 = Maryland, 51 = Virginia
-state_fips = ["11", "24", "51"]
+# Which group of states to pull. The choices, and the state codes and file names for each one, are in
+# regions.toml. You can also pick one with --region on the commands or the QCEW_REGION environment variable.
+# To use your own states instead, add `state_fips = ["06"]` here (FIPS codes: 11 = DC, 24 = Maryland,
+# 51 = Virginia, 06 = California) and a [validation.expected_county_counts] section to go with it.
+region = "dmv"
 
 # Ownership 5 = private sector. I'm sticking with private because government coverage
 # and pay rules are different enough that mixing them would make comparisons confusing.
@@ -38,12 +41,8 @@ agglevel_titles = "https://data.bls.gov/cew/doc/titles/agglevel/agglevel_titles.
 # These are relative to the project folder. You can override them with the
 # environment variables QCEW_RAW_DIR, QCEW_DB_PATH, QCEW_OUTPUT_DIR, QCEW_LAKE_DIR and QCEW_ANALYTICS_DB.
 raw_dir = "data/raw"
-db_path = "data/qcew_dmv.sqlite"
+# db_path, lake_dir and analytics_db come from the region (see regions.toml). Set them here to use other files.
 output_dir = "outputs"
-# Where the Parquet files go when the data is published (see publish.py).
-lake_dir = "data/lake"
-# The DuckDB file that dbt builds from those Parquet files (see analytics.py).
-analytics_db = "data/analytics.duckdb"
 
 [download]
 # BLS asks automated users to identify themselves. If you want to put your own
@@ -75,9 +74,3 @@ suppression_jump_points = 5.0
 source_rows_change_fraction = 0.10
 # avg_annual_pay should be about 52 x avg_weekly_wage. Allow some rounding room.
 wage_check_tolerance_dollars = 60
-
-[validation.expected_county_counts]
-# Counties and county-equivalents (independent cities count in Virginia).
-"11" = 1
-"24" = 24
-"51" = 133

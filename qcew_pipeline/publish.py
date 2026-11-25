@@ -32,7 +32,7 @@ from itertools import groupby
 from pathlib import Path
 
 from . import load
-from .config import load_config
+from .config import add_region_argument, load_config
 
 # year comes first because the rows are grouped by it; it ends up in the folder name, not in the file.
 FACT_COLUMNS = [
@@ -156,10 +156,11 @@ def publish_lake(cfg, out_dir=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Publish the QCEW database as Parquet files.")
     parser.add_argument("--config", help="path to a config.toml (default: the one inside the package)")
+    add_region_argument(parser)
     parser.add_argument("--out", help="folder for the Parquet files (default: lake_dir in the settings)")
     args = parser.parse_args(argv)
 
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.region)
     out = Path(args.out) if args.out else cfg["paths"]["lake_dir"]
     try:
         manifest = publish_lake(cfg, out)
