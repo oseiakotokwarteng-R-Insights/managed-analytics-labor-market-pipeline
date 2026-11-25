@@ -6,11 +6,13 @@ Dagster doesn't replace anything here. Each asset below calls the same code you 
     qcew_database  ->  qcew_parquet_files  ->  qcew_analytics_tables
          |
          +-->  cbp_comparison
+         +-->  dashboard_data
 
   qcew_database          collect, transform, check and load into SQLite (what qcew-run does)
   qcew_parquet_files     the Parquet files (what qcew-publish does)
   qcew_analytics_tables  the dbt tables and their tests (what qcew-build does)
   cbp_comparison         the second source, Census County Business Patterns, compared with QCEW (qcew-cbp)
+  dashboard_data         the JSON files the dashboard reads (qcew-dashboard)
 
 Three checks are attached. One warns if the validation step raised any warnings (the drift ones, for
 example). One runs the cross-check, which asks the database, pandas and dbt the same questions and
@@ -40,6 +42,7 @@ from .analytics import AnalyticsError, build_analytics
 from .cbp import CbpError, run_cbp
 from .collect import DownloadError
 from .config import load_config
+from .dashboard_export import DashboardError, export_dashboard
 from .load import connect
 from .publish import publish_lake
 from .run import run_pipeline, setup_logging
@@ -191,6 +194,28 @@ def cbp_comparison():
     )
 
 
+@dg.asset(
+    group_name=GROUP,
+    deps=[qcew_database, cbp_comparison],
+    kinds={"python", "json"},
+    description="The files the dashboard reads, written from the database. Set QCEW_DASHBOARD_DIR to choose where.",
+)
+def dashboard_data():
+    cfg = _config()
+    try:
+        summary = export_dashboard(cfg, os.environ.get("QCEW_DASHBOARD_DIR") or None)
+    except DashboardError as err:
+        raise dg.Failure(description=str(err)) from err
+    return dg.MaterializeResult(
+        metadata={
+            "folder": summary["folder"],
+            "years": f"{summary['years'][0]}-{summary['years'][-1]}",
+            "counties": summary["counties"],
+            "includes_second_source": summary["has_cbp"],
+        }
+    )
+
+
 @dg.asset_check(
     asset=qcew_analytics_tables,
     description="The database, pandas and dbt give the same answers, row by row.",
@@ -250,7 +275,7 @@ def new_bls_year_sensor(context: dg.SensorEvaluationContext):
 
 
 defs = dg.Definitions(
-    assets=[qcew_database, qcew_parquet_files, qcew_analytics_tables, cbp_comparison],
+    assets=[qcew_database, qcew_parquet_files, qcew_analytics_tables, cbp_comparison, dashboard_data],
     asset_checks=[database_pandas_dbt_agree],
     jobs=[qcew_refresh],
     schedules=[monthly_refresh],

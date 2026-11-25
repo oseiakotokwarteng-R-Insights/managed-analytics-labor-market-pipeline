@@ -31,3 +31,6 @@ analytics/target/
 analytics/logs/
 analytics/.user.yml
 outputs/dbt/
+dashboard/data/
+dashboard/data.new/
+dashboard/data.old/

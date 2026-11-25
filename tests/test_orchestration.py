@@ -11,6 +11,7 @@ dg = pytest.importorskip("dagster")
 from qcew_pipeline import analytics, load, orchestration, years  # noqa: E402
 from qcew_pipeline.cbp import CbpError  # noqa: E402
 from qcew_pipeline.collect import DownloadError  # noqa: E402
+from qcew_pipeline.dashboard_export import DashboardError  # noqa: E402
 from tests.test_load import fake_sources, fresh_db  # noqa: E402
 
 
@@ -51,6 +52,12 @@ def test_the_assets_run_in_order():
 def test_the_comparison_with_the_second_source_follows_the_database():
     key = dg.AssetKey
     assert orchestration.cbp_comparison.asset_deps[key("cbp_comparison")] == {key("qcew_database")}
+
+
+def test_the_dashboard_data_comes_after_both_sources_of_numbers():
+    key = dg.AssetKey
+    deps = orchestration.dashboard_data.asset_deps[key("dashboard_data")]
+    assert deps == {key("qcew_database"), key("cbp_comparison")}
 
 
 def test_the_job_schedule_and_sensor_are_registered():
@@ -209,6 +216,32 @@ def test_a_comparison_that_cannot_run_fails_the_asset(wired, monkeypatch, error)
 
     monkeypatch.setattr(orchestration, "run_cbp", cannot)
     assert not dg.materialize([orchestration.cbp_comparison], raise_on_error=False).success
+
+
+# ---------------------------------------------------------------- the dashboard files
+
+
+def test_the_dashboard_files_are_written_and_reported(wired, monkeypatch, tmp_path):
+    asked = []
+
+    def fake_export(cfg, out_dir=None):
+        asked.append(out_dir)
+        return {"folder": str(tmp_path), "years": [2021, 2025], "counties": 158, "sector_files": 158, "has_cbp": False}
+
+    monkeypatch.setattr(orchestration, "export_dashboard", fake_export)
+    monkeypatch.setenv("QCEW_DASHBOARD_DIR", str(tmp_path / "site"))
+    result = dg.materialize([orchestration.dashboard_data])
+    assert result.success and asked == [str(tmp_path / "site")]
+    metadata = result.get_asset_materialization_events()[0].materialization.metadata
+    assert metadata["counties"].value == 158 and metadata["years"].value == "2021-2025"
+
+
+def test_nothing_to_show_yet_fails_the_dashboard_asset(wired, monkeypatch):
+    def nothing(cfg, out_dir=None):
+        raise DashboardError("The database has no private-sector rows for these states yet.")
+
+    monkeypatch.setattr(orchestration, "export_dashboard", nothing)
+    assert not dg.materialize([orchestration.dashboard_data], raise_on_error=False).success
 
 
 # ---------------------------------------------------------------- the cross-check

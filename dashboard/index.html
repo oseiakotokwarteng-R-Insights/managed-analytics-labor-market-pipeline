@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Labor Market Explorer | Managed Analytics</title>
+<meta name="description" content="Explore jobs, wages and businesses by county and industry, from free public data published by the U.S. Bureau of Labor Statistics. A sample project from Managed Analytics.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231d5fa3'/%3E%3Cpath d='M7 22V10l9 7 9-7v12' fill='none' stroke='white' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="head">
+  <div class="wrap head-row">
+    <div class="brand">Labor Market Explorer<small>A Managed Analytics sample project</small></div>
+    <nav class="nav" id="nav" aria-label="Sections">
+      <a href="#/counties" data-route="counties">Counties</a>
+      <a href="#/rankings" data-route="rankings">Rankings</a>
+      <a href="#/states" data-route="states">States</a>
+      <a href="#/checks" data-route="checks">Data checks</a>
+    </nav>
+    <button class="theme" id="theme" type="button" aria-label="Switch between light and dark" title="Light / dark">&#9680;</button>
+  </div>
+</header>
+<main id="main" class="wrap" tabindex="-1"><p class="loading">Loading the numbers&hellip;</p></main>
+<footer class="foot">
+  <div class="wrap foot-row">
+    <p id="foot-data" class="foot-data"></p>
+    <p class="powered">Powered by <a href="https://managedanalytics.co" target="_blank" rel="noopener">Managed Analytics</a></p>
+  </div>
+</footer>
+<noscript><p class="wrap">This page needs JavaScript to draw its charts and tables.</p></noscript>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

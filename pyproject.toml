@@ -29,6 +29,7 @@ qcew-check-updates = "qcew_pipeline.check_updates:main"
 qcew-publish = "qcew_pipeline.publish:main"
 qcew-build = "qcew_pipeline.analytics:main"
 qcew-cbp = "qcew_pipeline.cbp:main"
+qcew-dashboard = "qcew_pipeline.dashboard_export:main"
 
 [project.urls]
 Source = "https://github.com/oseiakotokwarteng-R-Insights/managed-analytics-labor-market-pipeline"

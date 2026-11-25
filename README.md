@@ -33,7 +33,7 @@ I also ran the analytics layer on the same real data. dbt built one seed, five v
 2. **An analytics layer.** Done. The Parquet files, the dbt project with its tests, and a check on the real data that the dbt numbers match what the database says.
 3. **Scheduling.** Done. Dagster shows how the data flows from one step to the next, a schedule refreshes it once a month, and a sensor starts a run when BLS publishes a new year.
 4. **More regions and a second source.** Done, but not yet tried on real data. California is one setting (see "Another region" below), and Census County Business Patterns is a second source to check QCEW against (see "A second source" below).
-5. **A small dashboard** for people who don't want to write SQL.
+5. **A small dashboard** for people who don't want to write SQL. Built (see "A dashboard" below). Putting it online with the real data is still to do.
 6. **A forecast** of employment, compared against simple baselines and tested on data it hasn't seen.
 
 ## Parquet files
@@ -101,6 +101,33 @@ The two sources count jobs differently, so I expect them to be close, not equal.
 Those limits are where I start to wonder, not anything official, and they're in `config.toml` if you want to change them. Hidden Census numbers stay empty, the same rule as everywhere else, and the noise flag Census gives each number is kept next to it. The Census data lives in its own tables (`cbp_county` and `cbp_files`), so it can never change a QCEW number.
 
 I haven't run this against the real Census files yet. The tests use small made-up files that follow the layout Census documents. Census doesn't spell out a few details, like exactly how it writes the industry codes, so the real files may need a small fix, and the reader is built to stop with a clear message if the layout isn't what it expects.
+
+## A dashboard
+
+For people who don't want to write SQL, there's a small dashboard. You can pick a county, see its jobs, pay and businesses over the years, see what its jobs are in, rank every county side by side, and see how much to trust the numbers.
+
+```bash
+qcew-dashboard
+```
+
+```bash
+python -m http.server 8000 --directory dashboard
+```
+
+The first command writes the numbers the dashboard needs from your database (it needs `qcew-run` first). The second serves the `dashboard` folder, and you open `http://localhost:8000`. It has to be served this way, because browsers won't read the files straight from your disk.
+
+There are four pages:
+
+* **Counties.** Jobs, average weekly wage and businesses for one county, year by year, with the option to compare it with another county. Below that, the industries the jobs are in.
+* **Rankings.** Every county for a year. You can sort by any column and search by name.
+* **States.** Each state's total from BLS next to its counties added up, with the "unknown or undefined" bucket shown. It's the same thing the dbt tests caught, now visible to anyone.
+* **Data checks.** What the pipeline's checks found on the last run, which files the data came from (with their fingerprints), and, if you ran `qcew-cbp`, how the second source compares.
+
+A number that BLS hides shows as "hidden", on the charts and in the tables. It's never drawn as a zero and never estimated. A gap in a chart is a gap in the data.
+
+The dashboard is plain HTML, CSS and JavaScript. It has no framework, loads nothing from other websites, and tracks nothing, so you can put the `dashboard` folder on any web host. It follows your device's light or dark setting. The data files it reads are generated, so they aren't in the repository.
+
+I tested the part that writes the files, and checked that the pages and their files fit together. I looked at the pages in a browser, on a computer-sized screen and a phone-sized one, using made-up numbers, because I haven't run the pipeline on the real data and published the result yet.
 
 ## Try it
 
