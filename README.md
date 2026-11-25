@@ -33,7 +33,7 @@ I also ran the analytics layer on the same real data. dbt built one seed, five v
 2. **An analytics layer.** Done. The Parquet files, the dbt project with its tests, and a check on the real data that the dbt numbers match what the database says.
 3. **Scheduling.** Done. Dagster shows how the data flows from one step to the next, a schedule refreshes it once a month, and a sensor starts a run when BLS publishes a new year.
 4. **More regions and a second source.** Done, but not yet tried on real data. California is one setting (see "Another region" below), and Census County Business Patterns is a second source to check QCEW against (see "A second source" below).
-5. **A small dashboard** for people who don't want to write SQL. Built (see "A dashboard" below). Putting it online with the real data is still to do.
+5. **A small dashboard** for people who don't want to write SQL. Done, and live at [labor-demo.managedanalytics.co](https://labor-demo.managedanalytics.co) (see "A dashboard" below).
 6. **A forecast** of employment, compared against simple baselines and tested on data it hasn't seen.
 
 ## Parquet files
@@ -127,7 +127,13 @@ A number that BLS hides shows as "hidden", on the charts and in the tables. It's
 
 The dashboard is plain HTML, CSS and JavaScript. It has no framework, loads nothing from other websites, and tracks nothing, so you can put the `dashboard` folder on any web host. It follows your device's light or dark setting. The data files it reads are generated, so they aren't in the repository.
 
-I tested the part that writes the files, and checked that the pages and their files fit together. I looked at the pages in a browser, on a computer-sized screen and a phone-sized one, using made-up numbers, because I haven't run the pipeline on the real data and published the result yet.
+It's live at [labor-demo.managedanalytics.co](https://labor-demo.managedanalytics.co), showing the real data for DC, Maryland and Virginia, 2021 to 2025.
+
+### How it got online
+
+A GitHub workflow called "Dashboard data" (started by hand from the Actions tab) runs the whole pipeline on the real BLS files, writes the dashboard files, and saves them on a branch called `dashboard-data`. That branch holds nothing but those generated files. Then `deploy/deploy_dashboard.ps1` builds the website from the `dashboard` folder plus that branch and uploads it to Cloudflare, where it's served as plain static files. To redo it, run the workflow again and then the script.
+
+I tested the part that writes the files, and checked that the pages and their files fit together. I also looked at the real numbers in a browser, on a computer-sized screen and a phone-sized one. On the real data, the States page and the Data checks page show the same things this README describes: the unknown bucket holds about 5.5% of Maryland's jobs and 6.6% of Virginia's, and the two drift warnings flag 2025.
 
 ## Try it
 

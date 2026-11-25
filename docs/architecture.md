@@ -37,6 +37,8 @@ flowchart LR
 | `qcew_pipeline/cross_source.py` | Compares QCEW with County Business Patterns (state totals, county by county, and by industry), keeps the results in the database, and writes the report. |
 | `qcew_pipeline/dashboard_export.py` | Reads the SQLite database and writes the small JSON files the dashboard shows (counties, industries, state totals, check results). Also the `qcew-dashboard` command. |
 | `dashboard/` | The dashboard itself: plain HTML, CSS and JavaScript with hand-drawn SVG charts. It reads the JSON files and nothing else. The generated `dashboard/data/` folder isn't in the repository. |
+| `.github/workflows/dashboard-data.yml` | A workflow I start by hand. It runs the pipeline on the real BLS files, writes the dashboard files, and saves them on the `dashboard-data` branch. It also keeps the database and the logs as a download for a while. |
+| `deploy/` | `build_site.py` puts the website together from the `dashboard` folder and the `dashboard-data` branch. `wrangler.jsonc` and `deploy_dashboard.ps1` upload it to Cloudflare. |
 | `qcew_pipeline/run.py` | Runs all the steps in order, with logging and timing, and decides what to do when something fails. |
 | `qcew_pipeline/export.py` | Writes CSV files from the database. |
 | `qcew_pipeline/check_updates.py` | Asks BLS whether there's a newer yearly file. If it can't reach BLS it exits with code 2, so a broken check never looks like "no news". |
@@ -85,6 +87,10 @@ flowchart LR
 **Only compare what both publish.** Each source hides different numbers. A row is only compared when both show a number, and a hidden number is never turned into a zero to make a comparison work.
 
 **The dashboard reads files, not a database.** `qcew-dashboard` turns the database into a few small JSON files, and the page only ever reads those. That means the dashboard can live on any static web host, there's no server to run or keep safe, and nobody can run a query against the database. It also means the dashboard can only show what I chose to export.
+
+**The data lives on its own branch.** The generated files never go in `main`. A workflow writes them to a separate `dashboard-data` branch, so `main` stays code and documents, and the published numbers can be traced to one run. Each run replaces that branch.
+
+**The site tells the browser what it's allowed to load.** The deploy adds a content security policy that only allows the site's own files. If a page ever tried to load something from somewhere else, the browser would refuse.
 
 **No libraries and no outside requests.** The charts are drawn by about a hundred lines of code, and the page loads nothing from other sites. It works the same offline, and there's nothing to track, update or break because someone else changed a file. A test checks this.
 
