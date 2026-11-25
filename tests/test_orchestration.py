@@ -46,18 +46,21 @@ def test_the_assets_run_in_order():
     assert orchestration.qcew_analytics_tables.asset_deps[key("qcew_analytics_tables")] == {key("qcew_parquet_files")}
 
 
-def test_the_job_schedule_and_sensor_exist():
+def test_the_job_schedule_and_sensor_are_registered():
     defs = orchestration.defs
-    assert defs.get_job_def("qcew_refresh").name == "qcew_refresh"
-    assert defs.get_schedule_def("qcew_monthly_refresh").cron_schedule == "0 14 1 * *"
-    assert defs.get_sensor_def("new_bls_year_sensor").minimum_interval_seconds == 24 * 60 * 60
+    assert orchestration.qcew_refresh in defs.jobs
+    assert orchestration.monthly_refresh in defs.schedules
+    assert orchestration.new_bls_year_sensor in defs.sensors
+
+
+def test_the_schedule_and_sensor_timing():
+    assert orchestration.monthly_refresh.cron_schedule == "0 14 1 * *"
+    assert orchestration.new_bls_year_sensor.minimum_interval_seconds == 24 * 60 * 60
 
 
 def test_nothing_starts_until_it_is_switched_on():
-    schedule = orchestration.defs.get_schedule_def("qcew_monthly_refresh")
-    sensor = orchestration.defs.get_sensor_def("new_bls_year_sensor")
-    assert schedule.default_status == dg.DefaultScheduleStatus.STOPPED
-    assert sensor.default_status == dg.DefaultSensorStatus.STOPPED
+    assert orchestration.monthly_refresh.default_status == dg.DefaultScheduleStatus.STOPPED
+    assert orchestration.new_bls_year_sensor.default_status == dg.DefaultSensorStatus.STOPPED
 
 
 # ---------------------------------------------------------------- the database asset
