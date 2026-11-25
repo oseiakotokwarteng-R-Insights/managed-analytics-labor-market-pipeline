@@ -24,7 +24,9 @@ def data(tmp_path):
 
 def test_the_site_is_the_pages_plus_the_data(data, tmp_path):
     out = build_site.build(tmp_path / "site", data)
-    assert (out / "index.html").is_file() and (out / "js" / "app.js").is_file() and (out / "css" / "style.css").is_file()
+    assert (
+        (out / "index.html").is_file() and (out / "js" / "app.js").is_file() and (out / "css" / "style.css").is_file()
+    )
     assert (out / "data" / "meta.json").is_file() and (out / "data" / "sectors" / "24031.json").is_file()
 
 
@@ -51,7 +53,9 @@ def test_leftover_generated_data_in_the_dashboard_folder_is_not_copied(data, tmp
 def test_the_site_says_it_only_loads_its_own_files(data, tmp_path):
     headers = (build_site.build(tmp_path / "site", data) / "_headers").read_text(encoding="utf-8")
     assert "default-src 'self'" in headers and "script-src 'self'" in headers
-    assert "unsafe-eval" not in headers and "script-src 'self' 'unsafe-inline'" not in headers  # scripts are never inline
+    assert (
+        "unsafe-eval" not in headers and "script-src 'self' 'unsafe-inline'" not in headers
+    )  # scripts are never inline
     assert "/data/*" in headers and "no-cache" in headers
 
 
