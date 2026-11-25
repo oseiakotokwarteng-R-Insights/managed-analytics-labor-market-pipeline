@@ -105,9 +105,8 @@ def test_the_region_flag_reaches_the_settings_loader(monkeypatch, cfg):
         return cfg
 
     monkeypatch.setattr(run, "load_config", load)
-    monkeypatch.setattr(
-        run, "run_pipeline", lambda config, years=None, refs=None: {"status": "success", "years": years}
-    )
+    fake_run = lambda config, years=None, refs=None: {"status": "success", "years": years}  # noqa: E731
+    monkeypatch.setattr(run, "run_pipeline", fake_run)
     run.main(["--region", "california"])
     run.main([])
     assert asked == ["california", None]  # nothing given means the settings or the default decide
