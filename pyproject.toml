@@ -20,7 +20,8 @@ dependencies = ["pandas>=2.2"]
 
 [project.optional-dependencies]
 analytics = ["duckdb>=1.1,<2", "dbt-core==1.12.5", "dbt-duckdb==1.11.0"]
-dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11", "pandas-stubs", "qcew-pipeline[analytics]"]
+orchestration = ["qcew-pipeline[analytics]", "dagster==1.13.31", "dagster-webserver==1.13.31"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11", "pandas-stubs", "qcew-pipeline[orchestration]"]
 
 [project.scripts]
 qcew-run = "qcew_pipeline.run:main"
@@ -37,6 +38,10 @@ packages = ["qcew_pipeline"]
 
 [tool.setuptools.package-data]
 qcew_pipeline = ["config.toml", "schema.sql"]
+
+[tool.dagster]
+module_name = "qcew_pipeline.orchestration"
+code_location_name = "qcew"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
