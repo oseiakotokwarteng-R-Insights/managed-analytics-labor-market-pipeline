@@ -1,0 +1,12 @@
+{
+  // The public dashboard: a Cloudflare Worker that only serves static files (the folder built by deploy/build_site.py).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "labor-market-explorer",
+  "compatibility_date": "2026-09-25",
+  "assets": {
+    "directory": "../dist/dashboard-site"
+  },
+  "routes": [
+    { "pattern": "labor-demo.managedanalytics.co", "custom_domain": true }
+  ]
+}
