@@ -18,9 +18,9 @@ class CheckError(Exception):
     """Raised when BLS can't be reached or gives an answer that doesn't make sense."""
 
 
-def year_exists(year, cfg):
-    """True if BLS has published the annual file for this year, False if it has not (404)."""
-    url = cfg["urls"]["annual_file"].format(year=year)
+def year_exists(year, cfg, url_key="annual_file"):
+    """True if the file for this year is published, False if it is not (404). Asks BLS unless told another source."""
+    url = cfg["urls"][url_key].format(year=year, yy=f"{year % 100:02d}")
     req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": cfg["download"]["user_agent"]})
     try:
         with urllib.request.urlopen(req, timeout=cfg["download"]["timeout_seconds"]) as resp:
@@ -28,9 +28,9 @@ def year_exists(year, cfg):
     except urllib.error.HTTPError as err:
         if err.code == 404:
             return False
-        raise CheckError(f"BLS answered {err.code} for {url}") from err
+        raise CheckError(f"{url} answered {err.code}") from err
     except (urllib.error.URLError, TimeoutError, ConnectionError) as err:
-        raise CheckError(f"Could not reach BLS ({url}): {err}") from err
+        raise CheckError(f"Could not reach {url}: {err}") from err
 
 
 def latest_published_year(cfg, today=None):

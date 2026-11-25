@@ -111,7 +111,39 @@ One row per check per run: `check_name`, `level` (error / warn / info), `passed`
 
 Errors stop the load. Warnings are written down for me to look at.
 
+## `cbp_county` (the second source)
+
+County Business Patterns from the Census Bureau: one row per county, year and industry. It's kept apart from `qcew_annual` and compared with it by the `v_qcew_vs_cbp` view. Only the states in the region are kept, and only all industries and two-digit sectors.
+
+| Column | Meaning |
+|---|---|
+| `area_fips` | Five-digit county code (state plus county), the same as in `qcew_annual`. |
+| `year` | The data year. |
+| `naics_code` | Census's own industry code: `------` for all industries, or `23----` for a sector. |
+| `industry_code` | The matching QCEW code: `10` for all industries, `23`, `31-33` and so on. |
+| `employment` | Employees in the week of March 12. Census adds noise. Empty if Census withheld it, never zero. |
+| `employment_flag` | Census's noise flag (G is under 2% noise, H is 2% to under 5%, J is 5% or more), or a withheld flag (D or S). |
+| `annual_payroll` | Annual payroll in dollars. Census publishes thousands of dollars, so I multiply by 1,000. Empty if withheld. |
+| `payroll_flag` | The same kind of flag, for payroll. |
+| `establishments` | Number of establishments (business locations). |
+| `is_withheld` | 1 if employment was withheld. |
+| `cbp_file_id` | Which downloaded file the row came from (see `cbp_files`). |
+
+## `cbp_files` and `cross_source_results`
+
+`cbp_files` has one row each time a Census file is loaded: the year, where it came from, when, its size and SHA-256 fingerprint, and how many rows were read and kept. `cross_source_results` keeps every result of every comparison: the check name, its level (`warn` or `info`), whether it passed, and a plain-words detail.
+
+| Check | Level | What it means |
+|---|---|---|
+| `cbp_rows_matched` | info | How many QCEW county rows have a Census row for the same county and industry. |
+| `cbp_state_employment_ratio` | warn | A state whose employment, added up from its counties, is more than 15% away from QCEW. |
+| `cbp_state_establishment_ratio` | warn | The same for the number of businesses (25%). |
+| `cbp_county_outliers` | warn | A county with at least 1,000 jobs whose Census-to-QCEW ratio is outside 0.5 to 1.5. |
+| `cbp_sector_ratios` | info | The typical Census-to-QCEW ratio for each industry. |
+| `cbp_withheld_share` | info | How much of the employment data each source hides. |
+
 ## Views
 
 * `v_county_totals`: county-level all-industry rows with area names, ready to query.
 * `v_county_sectors`: county-level sector rows with area and industry names.
+* `v_qcew_vs_cbp`: QCEW and County Business Patterns side by side for every county and industry both publish (private sector only).

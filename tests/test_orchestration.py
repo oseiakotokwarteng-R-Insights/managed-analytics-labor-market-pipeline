@@ -9,6 +9,8 @@ import pytest
 dg = pytest.importorskip("dagster")
 
 from qcew_pipeline import analytics, load, orchestration, years  # noqa: E402
+from qcew_pipeline.cbp import CbpError  # noqa: E402
+from qcew_pipeline.collect import DownloadError  # noqa: E402
 from tests.test_load import fake_sources, fresh_db  # noqa: E402
 
 
@@ -44,6 +46,11 @@ def test_the_assets_run_in_order():
     key = dg.AssetKey
     assert orchestration.qcew_parquet_files.asset_deps[key("qcew_parquet_files")] == {key("qcew_database")}
     assert orchestration.qcew_analytics_tables.asset_deps[key("qcew_analytics_tables")] == {key("qcew_parquet_files")}
+
+
+def test_the_comparison_with_the_second_source_follows_the_database():
+    key = dg.AssetKey
+    assert orchestration.cbp_comparison.asset_deps[key("cbp_comparison")] == {key("qcew_database")}
 
 
 def test_the_job_schedule_and_sensor_are_registered():
@@ -158,6 +165,50 @@ def test_a_dbt_build_that_cannot_start_fails_the_asset(wired, monkeypatch):
 
     monkeypatch.setattr(orchestration, "build_analytics", cannot_start)
     assert not dg.materialize([orchestration.qcew_analytics_tables], raise_on_error=False).success
+
+
+# ---------------------------------------------------------------- the second source
+
+
+def cbp_result(warn=False):
+    detail = "CBP employment is more than 15% away from QCEW" if warn else "ok"
+    return {
+        "loaded_years": [2021, 2022, 2023],
+        "rows_saved": {2021: 900, 2022: 910, 2023: 915},
+        "not_published": [2024, 2025],
+        "report": "outputs/cbp_comparison.md",
+        "results": [
+            {"check_name": "cbp_state_employment_ratio", "level": "warn", "passed": not warn, "detail": detail},
+        ],
+    }
+
+
+def test_a_comparison_that_agrees_reports_what_it_did(wired, monkeypatch):
+    monkeypatch.setattr(orchestration, "run_cbp", lambda cfg: cbp_result())
+    result = dg.materialize([orchestration.cbp_comparison])
+    assert result.success
+    metadata = result.get_asset_materialization_events()[0].materialization.metadata
+    assert metadata["years_compared"].value == "2021-2023"
+    assert metadata["years_not_published_yet"].value == "2024, 2025"
+    assert [(e.check_name, e.passed) for e in result.get_asset_check_evaluations()] == [("sources_agree", True)]
+
+
+def test_a_disagreement_is_flagged_but_does_not_fail_the_run(wired, monkeypatch):
+    monkeypatch.setattr(orchestration, "run_cbp", lambda cfg: cbp_result(warn=True))
+    result = dg.materialize([orchestration.cbp_comparison])
+    assert result.success
+    (evaluation,) = result.get_asset_check_evaluations()
+    assert evaluation.passed is False and evaluation.severity == dg.AssetCheckSeverity.WARN
+    assert "cbp_state_employment_ratio" in evaluation.metadata["warnings"].value
+
+
+@pytest.mark.parametrize("error", [CbpError("Census hasn't published anything yet."), DownloadError("no download")])
+def test_a_comparison_that_cannot_run_fails_the_asset(wired, monkeypatch, error):
+    def cannot(cfg):
+        raise error
+
+    monkeypatch.setattr(orchestration, "run_cbp", cannot)
+    assert not dg.materialize([orchestration.cbp_comparison], raise_on_error=False).success
 
 
 # ---------------------------------------------------------------- the cross-check

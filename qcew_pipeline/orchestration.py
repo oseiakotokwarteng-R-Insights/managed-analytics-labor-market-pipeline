@@ -4,14 +4,17 @@ Dagster doesn't replace anything here. Each asset below calls the same code you 
 (qcew-run, qcew-publish, qcew-build), so the command line and Dagster always do the same thing.
 
     qcew_database  ->  qcew_parquet_files  ->  qcew_analytics_tables
+         |
+         +-->  cbp_comparison
 
   qcew_database          collect, transform, check and load into SQLite (what qcew-run does)
   qcew_parquet_files     the Parquet files (what qcew-publish does)
   qcew_analytics_tables  the dbt tables and their tests (what qcew-build does)
+  cbp_comparison         the second source, Census County Business Patterns, compared with QCEW (qcew-cbp)
 
-Two checks are attached. One warns if the validation step raised any warnings (the drift ones, for
-example). The other runs the cross-check, which asks the database, pandas and dbt the same questions
-and compares the answers.
+Three checks are attached. One warns if the validation step raised any warnings (the drift ones, for
+example). One runs the cross-check, which asks the database, pandas and dbt the same questions and
+compares the answers. One warns if the two sources, QCEW and County Business Patterns, disagree.
 
 There is one job that refreshes everything, a monthly schedule for it, and a sensor that asks BLS once
 a day whether it has published a year the database doesn't have yet. The schedule and the sensor start
@@ -34,6 +37,8 @@ import dagster as dg
 
 from . import years
 from .analytics import AnalyticsError, build_analytics
+from .cbp import CbpError, run_cbp
+from .collect import DownloadError
 from .config import load_config
 from .load import connect
 from .publish import publish_lake
@@ -152,6 +157,40 @@ def qcew_analytics_tables():
     return dg.MaterializeResult(metadata={"database": str(cfg["paths"]["analytics_db"])})
 
 
+@dg.asset(
+    group_name=GROUP,
+    deps=[qcew_database],
+    kinds={"python", "sqlite"},
+    description="The second source, Census County Business Patterns, downloaded and compared with QCEW.",
+    check_specs=[dg.AssetCheckSpec("sources_agree", asset="cbp_comparison")],
+)
+def cbp_comparison():
+    cfg = _config()
+    try:
+        result = run_cbp(cfg)
+    except CbpError as err:
+        raise dg.Failure(description=str(err)) from err
+    except (DownloadError, years.CheckError, ValueError) as err:
+        raise dg.Failure(description=f"Could not compare with County Business Patterns: {err}") from err
+
+    warnings = [r for r in result["results"] if r["level"] == "warn" and not r["passed"]]
+    yield dg.MaterializeResult(
+        metadata={
+            "years_compared": f"{result['loaded_years'][0]}-{result['loaded_years'][-1]}",
+            "years_not_published_yet": ", ".join(str(y) for y in result["not_published"]) or "none",
+            "rows_saved": dg.MetadataValue.json({str(y): n for y, n in result["rows_saved"].items()}),
+            "report": result["report"],
+        }
+    )
+    yield dg.AssetCheckResult(
+        check_name="sources_agree",
+        passed=not warnings,
+        severity=dg.AssetCheckSeverity.WARN,
+        description="QCEW and County Business Patterns are close." if not warnings else f"{len(warnings)} warning(s).",
+        metadata={"warnings": "\n".join(f"{r['check_name']}: {r['detail']}" for r in warnings) or "none"},
+    )
+
+
 @dg.asset_check(
     asset=qcew_analytics_tables,
     description="The database, pandas and dbt give the same answers, row by row.",
@@ -211,7 +250,7 @@ def new_bls_year_sensor(context: dg.SensorEvaluationContext):
 
 
 defs = dg.Definitions(
-    assets=[qcew_database, qcew_parquet_files, qcew_analytics_tables],
+    assets=[qcew_database, qcew_parquet_files, qcew_analytics_tables, cbp_comparison],
     asset_checks=[database_pandas_dbt_agree],
     jobs=[qcew_refresh],
     schedules=[monthly_refresh],

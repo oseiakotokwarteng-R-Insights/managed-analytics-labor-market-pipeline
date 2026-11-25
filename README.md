@@ -32,7 +32,7 @@ I also ran the analytics layer on the same real data. dbt built one seed, five v
 1. **Make it sturdier.** Done. It now notices rows BLS removes, loads faster, follows the newest year by itself, warns when the data suddenly changes shape, runs in Docker, and has style and type checks.
 2. **An analytics layer.** Done. The Parquet files, the dbt project with its tests, and a check on the real data that the dbt numbers match what the database says.
 3. **Scheduling.** Done. Dagster shows how the data flows from one step to the next, a schedule refreshes it once a month, and a sensor starts a run when BLS publishes a new year.
-4. **More regions and a second source.** California is in, and it's one setting (see "Another region" below). A second source, with checks between the two, is next.
+4. **More regions and a second source.** Done, but not yet tried on real data. California is one setting (see "Another region" below), and Census County Business Patterns is a second source to check QCEW against (see "A second source" below).
 5. **A small dashboard** for people who don't want to write SQL.
 6. **A forecast** of employment, compared against simple baselines and tested on data it hasn't seen.
 
@@ -81,6 +81,26 @@ There's one job that refreshes all three. There's a schedule that runs it on the
 The schedule and the sensor start switched off, so nothing downloads anything until you turn them on in the Dagster screen. Set `DAGSTER_HOME` to a folder first if you want Dagster to remember its run history, and set `QCEW_CONFIG` if you use your own settings file.
 
 I tested this part with automated tests that stand in for the real work, so they run in seconds and never download anything. They check how the steps are connected, what each one reports when it works or fails, and when the sensor asks for a run. I haven't run the Dagster version against the real BLS files yet.
+
+## A second source: County Business Patterns
+
+A single source can be wrong without anyone noticing, so I added a second one to check it against. The Census Bureau publishes County Business Patterns, which counts jobs, businesses and payroll by county and industry. It gets its numbers from different places than BLS does, so if my QCEW numbers are right, the two should land close together.
+
+```bash
+qcew-cbp
+```
+
+It looks at the years already in your database, downloads the Census county file for each year that Census has published (about 12 MB a year), saves it in its own tables, and compares the two sources. Census publishes about a year after BLS, so the newest QCEW years usually have no Census file yet. Those are skipped and listed, not treated as errors. The command writes a short report to `outputs/cbp_comparison.md`, and it saves every result in the database, so you can see how it changes over time.
+
+The two sources count jobs differently, so I expect them to be close, not equal. Census counts employees in the week of March 12 and QCEW averages the whole year. Census leaves out some kinds of work, and since 2020 it adds a little random noise to its numbers. Each source also hides different numbers to protect businesses, and I only compare rows where both show one. So the comparison only warns. Here's what it looks at:
+
+* The whole state, added up from its counties. Employment should be within 15% of QCEW, and the number of businesses within 25%.
+* Each county with at least 1,000 jobs, one at a time. Its ratio should stay between 0.5 and 1.5.
+* Which industries agree least, and how much each source hides. These are just for information.
+
+Those limits are where I start to wonder, not anything official, and they're in `config.toml` if you want to change them. Hidden Census numbers stay empty, the same rule as everywhere else, and the noise flag Census gives each number is kept next to it. The Census data lives in its own tables (`cbp_county` and `cbp_files`), so it can never change a QCEW number.
+
+I haven't run this against the real Census files yet. The tests use small made-up files that follow the layout Census documents. Census doesn't spell out a few details, like exactly how it writes the industry codes, so the real files may need a small fix, and the reader is built to stop with a clear message if the layout isn't what it expects.
 
 ## Try it
 

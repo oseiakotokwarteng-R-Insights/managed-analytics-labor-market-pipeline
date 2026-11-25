@@ -33,6 +33,8 @@ flowchart LR
 | `qcew_pipeline/analytics.py` | Runs the dbt project in the `analytics` folder on the Parquet files. It sets the paths, passes in the limits from `config.toml`, and turns dbt's result into an exit code. |
 | `analytics/` | The dbt project. Staging views clean up the Parquet files, three summary tables are built from them, and tests check the keys, the codes, the hidden-values rule, and the county, state and sector totals. |
 | `qcew_pipeline/orchestration.py` | The Dagster layer. Three steps (database, Parquet files, analytics tables) that call the same code as the commands above, two checks on them, one job, a monthly schedule, and a sensor that watches for a new year from BLS. Needs the `orchestration` extras. |
+| `qcew_pipeline/cbp.py` | The second source. Downloads the Census County Business Patterns county files, keeps the rows for the region, and saves them in their own tables. Also the `qcew-cbp` command. |
+| `qcew_pipeline/cross_source.py` | Compares QCEW with County Business Patterns (state totals, county by county, and by industry), keeps the results in the database, and writes the report. |
 | `qcew_pipeline/run.py` | Runs all the steps in order, with logging and timing, and decides what to do when something fails. |
 | `qcew_pipeline/export.py` | Writes CSV files from the database. |
 | `qcew_pipeline/check_updates.py` | Asks BLS whether there's a newer yearly file. If it can't reach BLS it exits with code 2, so a broken check never looks like "no news". |
@@ -73,6 +75,12 @@ flowchart LR
 **Nothing runs on its own until I say so.** The schedule and the sensor start switched off. A pipeline that downloads about 390 MB shouldn't start doing it just because someone opened the Dagster screen.
 
 **One run per new year.** The sensor gives each year it finds a run key, so if it ticks again before the first run has finished, it doesn't start a second one. If it can't reach BLS it fails, for the same reason `qcew-check-updates` exits with code 2.
+
+**A second source, kept apart.** County Business Patterns goes into its own tables (`cbp_county` and `cbp_files`), never into `qcew_annual`. That way the comparison can't change the numbers it's checking, and either source can be reloaded without touching the other. They meet only in a view, `v_qcew_vs_cbp`.
+
+**Close, not equal.** The two sources count jobs differently (the week of March 12 against a yearly average, different coverage, and noise that Census adds), so I never expect them to match. The comparison warns when they drift apart more than the limits in `config.toml`, and it never stops anything. I picked those limits as a starting point, so I expect to adjust them once I've seen real numbers.
+
+**Only compare what both publish.** Each source hides different numbers. A row is only compared when both show a number, and a hidden number is never turned into a zero to make a comparison work.
 
 **One main source.** Only QCEW. The state-total rows in the same file give me an independent check on the county rows.
 
