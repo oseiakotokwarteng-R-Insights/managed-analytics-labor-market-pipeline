@@ -84,7 +84,7 @@ def run_pipeline(cfg, years=None, refs=None):
             mark = "PASS" if c.passed else ("FAIL" if c.level == "error" else "WARN")
             log.info("check %-4s %-42s %s", mark, c.name, c.detail)
 
-        # Save provenance and check results whether or not we go on to load.
+        # Save the source file records and check results whether or not we go on to load.
         source_ids = {}
         for info in files:
             s = stats_by_year[info["year"]]

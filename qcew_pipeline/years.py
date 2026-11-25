@@ -15,7 +15,7 @@ LOOKBACK_YEARS = 4
 
 
 class CheckError(Exception):
-    """Raised when BLS can't be reached or gives an answer that isn't understood."""
+    """Raised when BLS can't be reached or gives an answer that doesn't make sense."""
 
 
 def year_exists(year, cfg):

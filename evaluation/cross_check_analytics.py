@@ -88,7 +88,7 @@ def year_over_year(county):
 
 
 def published_files_match_database(conn, lake):
-    """Are the Parquet files a faithful copy of the database as it is now?"""
+    """Are the Parquet files an exact copy of the database as it is now?"""
     manifest = json.loads((lake / "manifest.json").read_text(encoding="utf-8"))
     lake_counts = {int(y): p["rows"] for y, p in manifest["tables"]["qcew_annual"]["partitions"].items()}
     db_counts = dict(conn.execute("SELECT year, COUNT(*) FROM qcew_annual GROUP BY year").fetchall())

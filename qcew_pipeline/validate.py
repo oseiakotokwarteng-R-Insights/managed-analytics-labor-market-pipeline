@@ -3,7 +3,7 @@
 Every check returns a CheckResult. There are two levels that matter:
 
   error - something is wrong enough that the data shouldn't be loaded
-  warn  - worth a human looking at it, but the load can go ahead
+  warn  - worth a look, but the load can go ahead
 
 "info" results are just facts worth recording, like how many values were suppressed.
 Nothing here modifies the data; it only reports.
